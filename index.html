@@ -3,27 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zona Privada</title>
+<title>Mi Página Privada</title>
 
 <style>
 body{
     margin:0;
-    height:100vh;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #111, #1f1f1f);
+    color:white;
     display:flex;
     justify-content:center;
     align-items:center;
-    background: linear-gradient(135deg,#4a69bd,#1e3799);
-    font-family: Arial, sans-serif;
+    height:100vh;
+    overflow:hidden;
 }
 
-.card{
-    background:white;
-    padding:40px;
-    border-radius:20px;
+.container{
+    text-align:center;
+    background:#181818;
+    padding:30px;
+    border-radius:15px;
+    box-shadow:0 0 20px rgba(0,255,150,0.4);
     width:90%;
     max-width:400px;
-    text-align:center;
-    box-shadow:0 15px 40px rgba(0,0,0,0.3);
+    animation: fadeIn 1s ease-in-out;
 }
 
 h1{
@@ -31,101 +34,83 @@ h1{
 }
 
 input{
-    width:100%;
-    padding:12px;
-    margin:10px 0;
-    border-radius:10px;
-    border:1px solid #ccc;
+    width:90%;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    margin-bottom:15px;
+    font-size:16px;
 }
 
 button{
-    width:100%;
-    padding:12px;
+    padding:10px 20px;
     border:none;
-    border-radius:10px;
-    background:#4a69bd;
-    color:white;
+    border-radius:8px;
+    background:#00ff99;
+    color:black;
     font-weight:bold;
     cursor:pointer;
     transition:0.3s;
 }
 
 button:hover{
-    background:#1e3799;
+    background:#00cc77;
 }
 
-.error{
-    color:red;
-    margin-top:10px;
+img{
+    width:200px;
+    border-radius:10px;
+    margin-top:20px;
+}
+
+.hidden{
+    display:none;
+}
+
+@keyframes fadeIn{
+    from{opacity:0; transform:scale(0.9);}
+    to{opacity:1; transform:scale(1);}
 }
 </style>
 </head>
 
 <body>
 
-<div class="card" id="app"></div>
+<div class="container" id="loginBox">
+    <h1>Acceso Privado</h1>
+    <input type="password" id="password" placeholder="Ingresa la contraseña">
+    <br>
+    <button onclick="checkPassword()">Entrar</button>
+    <p id="error" style="color:red;"></p>
+</div>
+
+<div class="container hidden" id="contentBox">
+    <h1>Bienvenido 🔥</h1>
+    <p>Acceso concedido correctamente.</p>
+    
+    <!-- Cambia el nombre si tu imagen tiene otro nombre -->
+    <img src="Obito Uchiha.jpeg" alt="Imagen">
+
+    <br><br>
+    <button onclick="logout()">Cerrar Sesión</button>
+</div>
 
 <script>
-const contraseñaCorrecta = "bl4ck123"; // CAMBIA TU CONTRASEÑA AQUÍ
-let intentos = 0;
-const maxIntentos = 3;
-let bloqueoActivo = false;
+function checkPassword(){
+    var pass = document.getElementById("password").value;
+    var correctPassword = "c4br3r4132";  // 🔒 CAMBIA ESTA CONTRASEÑA
 
-const app = document.getElementById("app");
-
-function mostrarLogin(){
-    app.innerHTML = `
-        <h1>🔐 Acceso Privado</h1>
-        <input type="password" id="password" placeholder="Ingresa contraseña">
-        <button onclick="verificar()">Entrar</button>
-        <div class="error" id="error"></div>
-    `;
-}
-
-function mostrarPanel(){
-    app.innerHTML = `
-        <h1>🎉 Bienvenido</h1>
-        <p>Este es tu panel privado.</p>
-        <button onclick="cerrarSesion()">Cerrar sesión</button>
-    `;
-}
-
-function verificar(){
-    if(bloqueoActivo) return;
-
-    const pass = document.getElementById("password").value;
-    const error = document.getElementById("error");
-
-    if(pass === contraseñaCorrecta){
-        localStorage.setItem("logueado","true");
-        mostrarPanel();
+    if(pass === correctPassword){
+        document.getElementById("loginBox").classList.add("hidden");
+        document.getElementById("contentBox").classList.remove("hidden");
     } else {
-        intentos++;
-        error.innerText = "Intento " + intentos + " de 3";
-
-        if(intentos >= maxIntentos){
-            bloqueoActivo = true;
-            error.innerText = "🚫 Bloqueado 30 segundos";
-            
-            setTimeout(()=>{
-                intentos = 0;
-                bloqueoActivo = false;
-                error.innerText = "";
-            },30000);
-        }
+        document.getElementById("error").innerText = "Contraseña incorrecta";
     }
 }
 
-function cerrarSesion(){
-    localStorage.removeItem("logueado");
-    mostrarLogin();
-}
-
-// Auto login si ya estaba logueado
-if(localStorage.getItem("logueado") === "true"){
-    mostrarPanel();
-} else {
-    mostrarLogin();
+function logout(){
+    document.getElementById("contentBox").classList.add("hidden");
+    document.getElementById("loginBox").classList.remove("hidden");
 }
 </script>
 
