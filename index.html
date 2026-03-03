@@ -1,18 +1,133 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Mi Página Pro</title>
-    <style>
-        body{
-            background-color:black;
-            color:lime;
-            text-align:center;
-            font-family:monospace;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zona Privada</title>
+
+<style>
+body{
+    margin:0;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    background: linear-gradient(135deg,#4a69bd,#1e3799);
+    font-family: Arial, sans-serif;
+}
+
+.card{
+    background:white;
+    padding:40px;
+    border-radius:20px;
+    width:90%;
+    max-width:400px;
+    text-align:center;
+    box-shadow:0 15px 40px rgba(0,0,0,0.3);
+}
+
+h1{
+    margin-bottom:20px;
+}
+
+input{
+    width:100%;
+    padding:12px;
+    margin:10px 0;
+    border-radius:10px;
+    border:1px solid #ccc;
+}
+
+button{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:#4a69bd;
+    color:white;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+button:hover{
+    background:#1e3799;
+}
+
+.error{
+    color:red;
+    margin-top:10px;
+}
+</style>
 </head>
+
 <body>
-    <h1>Mi Web en GitHub 🚀</h1>
-    <p>Creada desde Android 😎</p>
+
+<div class="card" id="app"></div>
+
+<script>
+const contraseñaCorrecta = "bl4ck123"; // CAMBIA TU CONTRASEÑA AQUÍ
+let intentos = 0;
+const maxIntentos = 3;
+let bloqueoActivo = false;
+
+const app = document.getElementById("app");
+
+function mostrarLogin(){
+    app.innerHTML = `
+        <h1>🔐 Acceso Privado</h1>
+        <input type="password" id="password" placeholder="Ingresa contraseña">
+        <button onclick="verificar()">Entrar</button>
+        <div class="error" id="error"></div>
+    `;
+}
+
+function mostrarPanel(){
+    app.innerHTML = `
+        <h1>🎉 Bienvenido</h1>
+        <p>Este es tu panel privado.</p>
+        <button onclick="cerrarSesion()">Cerrar sesión</button>
+    `;
+}
+
+function verificar(){
+    if(bloqueoActivo) return;
+
+    const pass = document.getElementById("password").value;
+    const error = document.getElementById("error");
+
+    if(pass === contraseñaCorrecta){
+        localStorage.setItem("logueado","true");
+        mostrarPanel();
+    } else {
+        intentos++;
+        error.innerText = "Intento " + intentos + " de 3";
+
+        if(intentos >= maxIntentos){
+            bloqueoActivo = true;
+            error.innerText = "🚫 Bloqueado 30 segundos";
+            
+            setTimeout(()=>{
+                intentos = 0;
+                bloqueoActivo = false;
+                error.innerText = "";
+            },30000);
+        }
+    }
+}
+
+function cerrarSesion(){
+    localStorage.removeItem("logueado");
+    mostrarLogin();
+}
+
+// Auto login si ya estaba logueado
+if(localStorage.getItem("logueado") === "true"){
+    mostrarPanel();
+} else {
+    mostrarLogin();
+}
+</script>
+
 </body>
 </html>
