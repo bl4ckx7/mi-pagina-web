@@ -3,108 +3,114 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mi Página Privada</title>
+<title>Acceso</title>
 
 <style>
 body{
     margin:0;
     font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #111, #1f1f1f);
-    color:white;
+    background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
     display:flex;
     justify-content:center;
     align-items:center;
     height:100vh;
-    overflow:hidden;
+    color:white;
 }
 
 .container{
-    text-align:center;
-    background:#181818;
-    padding:30px;
-    border-radius:15px;
-    box-shadow:0 0 20px rgba(0,255,150,0.4);
     width:90%;
     max-width:400px;
-    animation: fadeIn 1s ease-in-out;
+    text-align:center;
 }
 
-h1{
-    margin-bottom:20px;
+.logo{
+    font-size:40px;
+    font-weight:bold;
+    margin-bottom:40px;
 }
 
 input{
-    width:90%;
-    padding:10px;
-    border:none;
-    border-radius:8px;
-    margin-bottom:15px;
+    width:100%;
+    padding:15px;
+    margin:10px 0;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.2);
+    background:rgba(255,255,255,0.1);
+    color:white;
     font-size:16px;
 }
 
+input::placeholder{
+    color:#ccc;
+}
+
 button{
-    padding:10px 20px;
+    width:100%;
+    padding:15px;
+    margin-top:15px;
     border:none;
-    border-radius:8px;
-    background:#00ff99;
-    color:black;
+    border-radius:25px;
+    background:#1877f2;
+    color:white;
+    font-size:16px;
     font-weight:bold;
     cursor:pointer;
     transition:0.3s;
 }
 
 button:hover{
-    background:#00cc77;
+    background:#145bd1;
 }
 
-img{
-    width:200px;
-    border-radius:10px;
+.link{
     margin-top:20px;
+    display:block;
+    color:#ddd;
+    font-size:14px;
+    cursor:pointer;
 }
 
 .hidden{
     display:none;
 }
 
-@keyframes fadeIn{
-    from{opacity:0; transform:scale(0.9);}
-    to{opacity:1; transform:scale(1);}
-}
 </style>
 </head>
 
 <body>
 
 <div class="container" id="loginBox">
-    <h1>Acceso Privado</h1>
-    <input type="password" id="password" placeholder="Ingresa la contraseña">
-    <br>
-    <button onclick="checkPassword()">Entrar</button>
-    <p id="error" style="color:red;"></p>
+    <div class="logo">MI ACCESO</div>
+
+    <input type="text" id="user" placeholder="Usuario o correo">
+    <input type="password" id="pass" placeholder="Contraseña">
+
+    <button onclick="login()">Iniciar sesión</button>
+
+    <span class="link">¿Olvidaste tu contraseña?</span>
 </div>
 
 <div class="container hidden" id="contentBox">
     <h1>Bienvenido 🔥</h1>
-    <p>Acceso concedido correctamente.</p>
-    
-    <!-- Cambia el nombre si tu imagen tiene otro nombre -->
-    <img src="Obito Uchiha.jpeg" alt="Imagen">
+    <p>Has iniciado sesión correctamente.</p>
+
+    <img src="Obito Uchiha.jpeg" width="200" style="border-radius:10px; margin-top:20px;">
 
     <br><br>
-    <button onclick="logout()">Cerrar Sesión</button>
+    <button onclick="logout()">Cerrar sesión</button>
 </div>
 
 <script>
-function checkPassword(){
-    var pass = document.getElementById("password").value;
-    var correctPassword = "c4br3r4132";  // 🔒 CAMBIA ESTA CONTRASEÑA
+function login(){
+    var usuario = document.getElementById("user").value;
+    var password = document.getElementById("pass").value;
 
-    if(pass === correctPassword){
+    // 🔒 Cambia estos datos
+    if(usuario === "admin" && password === "1234"){
         document.getElementById("loginBox").classList.add("hidden");
         document.getElementById("contentBox").classList.remove("hidden");
     } else {
-        document.getElementById("error").innerText = "Contraseña incorrecta";
+        alert("Datos incorrectos");
     }
 }
 
