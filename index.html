@@ -1,124 +1,594 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Acceso</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Neon Dash — Juego tipo Geometry Dash (Single File)</title>
 
-<style>
-body{
-    margin:0;
-    font-family: Arial, sans-serif;
-    background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-    color:white;
-}
+  <!-- ============================
+       CSS (todo inline)
+       ============================ -->
+  <style>
+    :root{
+      --bg:#06060a;
+      --neon1:#00f0ff;
+      --neon2:#ff00d0;
+      --panel: rgba(255,255,255,0.04);
+      --glass: rgba(255,255,255,0.03);
+      --accent: linear-gradient(90deg,var(--neon1),var(--neon2));
+      --font: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:radial-gradient(circle at 10% 10%, rgba(0,255,255,0.03), transparent 10%), var(--bg); font-family:var(--font); color:#fff; -webkit-font-smoothing:antialiased}
+    canvas{display:block; position:fixed; inset:0; width:100%; height:100%}
 
-.container{
-    width:90%;
-    max-width:400px;
-    text-align:center;
-}
+    #ui{
+      position:fixed; z-index:40; inset:0; pointer-events:none;
+      display:flex; align-items:flex-start; justify-content:center; padding:28px;
+    }
 
-.logo{
-    font-size:40px;
-    font-weight:bold;
-    margin-bottom:40px;
-}
+    #menu{
+      margin-top:40px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+      border-radius:14px; padding:18px; text-align:center; pointer-events:auto;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.04);
+      min-width:260px;
+    }
 
-input{
-    width:100%;
-    padding:15px;
-    margin:10px 0;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,0.2);
-    background:rgba(255,255,255,0.1);
-    color:white;
-    font-size:16px;
-}
+    #title{
+      font-size:28px; letter-spacing:6px; margin-bottom:6px;
+      background: -webkit-linear-gradient(90deg,var(--neon1),var(--neon2));
+      -webkit-background-clip: text; color: transparent; font-weight:800;
+      text-shadow: 0 0 12px rgba(0,255,255,0.07);
+    }
 
-input::placeholder{
-    color:#ccc;
-}
+    .neon-btn{
+      margin:8px 6px; padding:10px 14px; border-radius:10px; cursor:pointer;
+      border:none; font-weight:700; background:var(--panel); color:white; pointer-events:auto;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.6), 0 0 18px rgba(0,255,255,0.03) inset;
+      transition: transform .12s ease, box-shadow .12s;
+    }
+    .neon-btn:hover{ transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.6) }
+    .neon-btn.small{ padding:6px 8px; font-size:13px }
+    .neon-btn.alt{ background:transparent; border:1px solid rgba(255,255,255,0.06) }
 
-button{
-    width:100%;
-    padding:15px;
-    margin-top:15px;
-    border:none;
-    border-radius:25px;
-    background:#1877f2;
-    color:white;
-    font-size:16px;
-    font-weight:bold;
-    cursor:pointer;
-    transition:0.3s;
-}
+    .neon-toggle{ display:inline-flex; align-items:center; gap:8px; margin-top:6px; cursor:pointer; pointer-events:auto }
+    .neon-toggle input{ transform:scale(1.1) }
 
-button:hover{
-    background:#145bd1;
-}
+    .small{font-size:12px; opacity:0.9; margin-top:6px}
 
-.link{
-    margin-top:20px;
-    display:block;
-    color:#ddd;
-    font-size:14px;
-    cursor:pointer;
-}
+    #hud{ position:fixed; top:18px; left:18px; pointer-events:auto; z-index:50; display:flex; gap:12px; align-items:center}
+    #score{ font-size:20px; padding:8px 12px; border-radius:10px; background:var(--glass); border:1px solid rgba(255,255,255,0.03) }
+    #controls{ display:flex; gap:6px }
+    .mini{ padding:6px 8px; border-radius:8px; background:var(--panel); border:none; cursor:pointer }
 
-.hidden{
-    display:none;
-}
+    .hidden{ display:none !important }
 
-</style>
+    /* Modal editor styles */
+    .modal{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(6px); pointer-events:auto; z-index:60 }
+    .modal .modal-content{
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      padding:16px; border-radius:12px; width:92%; max-width:720px; border:1px solid rgba(255,255,255,0.04);
+    }
+    .row{ display:flex; gap:8px; align-items:center; margin:8px 0 }
+    label{ min-width:140px; font-size:14px; opacity:0.9 }
+    input[type="number"], textarea{ flex:1; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02); color:#fff }
+
+    #levelJSON{ font-family:monospace; font-size:13px; color:#eee }
+
+    @media (max-width:600px){
+      #menu{ min-width:200px; margin-top:20px }
+      #title{ font-size:22px }
+      .neon-btn{ padding:8px 12px }
+    }
+  </style>
 </head>
-
 <body>
 
-<div class="container" id="loginBox">
-    <div class="logo">MI ACCESO</div>
+  <!-- ============================
+       UI (HTML)
+       ============================ -->
+  <div id="ui">
+    <div id="title">NEON DASH</div>
 
-    <input type="text" id="user" placeholder="Usuario o correo">
-    <input type="password" id="pass" placeholder="Contraseña">
+    <div id="menu">
+      <button id="btnStart" class="neon-btn">Jugar</button>
+      <button id="btnEditor" class="neon-btn">Editor de niveles</button>
+      <label class="neon-toggle">
+        <input id="toggleMusic" type="checkbox" checked>
+        Música
+      </label>
+      <div class="small">Toque / Barra espaciadora para saltar</div>
+      <div id="best" class="small">Mejor: <span id="bestScore">0</span></div>
+    </div>
 
-    <button onclick="login()">Iniciar sesión</button>
+    <div id="hud" class="hidden">
+      <div id="score">0</div>
+      <div id="controls">
+        <button id="pauseBtn" class="mini">❚❚</button>
+        <button id="restartBtn" class="mini">⟲</button>
+      </div>
+    </div>
 
-    <span class="link">¿Olvidaste tu contraseña?</span>
-</div>
+    <!-- Editor modal -->
+    <div id="editorModal" class="modal hidden">
+      <div class="modal-content">
+        <h3>Editor básico de niveles</h3>
+        <div class="row">
+          <label>Velocidad inicial</label>
+          <input id="edSpeed" type="number" value="6" min="1" max="30">
+        </div>
+        <div class="row">
+          <label>Intervalo spawn (ms)</label>
+          <input id="edInterval" type="number" value="2000" min="200" max="10000">
+        </div>
+        <div class="row">
+          <button id="addBlock" class="neon-btn small">Agregar bloque</button>
+          <button id="addSpike" class="neon-btn small">Agregar pico</button>
+          <button id="exportLevel" class="neon-btn small">Exportar JSON</button>
+          <button id="importLevelBtn" class="neon-btn small">Importar JSON</button>
+        </div>
+        <textarea id="levelJSON" placeholder='Pegar/Ver JSON aquí' rows="6"></textarea>
+        <div class="row">
+          <button id="saveLevel" class="neon-btn">Guardar y usar nivel</button>
+          <button id="closeEditor" class="neon-btn alt">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-<div class="container hidden" id="contentBox">
-    <h1>Bienvenido 🔥</h1>
-    <p>Has iniciado sesión correctamente.</p>
+  <canvas id="gameCanvas"></canvas>
 
-    <img src="Obito Uchiha.jpeg" width="200" style="border-radius:10px; margin-top:20px;">
+  <!-- Hidden audio (pon bgm.mp3 en la misma carpeta si quieres música) -->
+  <audio id="bgm" src="bgm.mp3" loop crossorigin="anonymous"></audio>
 
-    <br><br>
-    <button onclick="logout()">Cerrar sesión</button>
-</div>
+  <!-- ============================
+       JS (todo inline, tipo módulo)
+       ============================ -->
+  <script type="module">
+    // --- Referencias DOM ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-<script>
-function login(){
-    var usuario = document.getElementById("user").value;
-    var password = document.getElementById("pass").value;
+    const bgm = document.getElementById('bgm');
+    const toggleMusic = document.getElementById('toggleMusic');
+    const btnStart = document.getElementById('btnStart');
+    const btnEditor = document.getElementById('btnEditor');
+    const hud = document.getElementById('hud');
+    const menu = document.getElementById('menu');
+    const title = document.getElementById('title');
+    const scoreEl = document.getElementById('score');
+    const bestScoreEl = document.getElementById('bestScore');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const restartBtn = document.getElementById('restartBtn');
 
-    // 🔒 Cambia estos datos
-    if(usuario === "admin" && password === "1234"){
-        document.getElementById("loginBox").classList.add("hidden");
-        document.getElementById("contentBox").classList.remove("hidden");
-    } else {
-        alert("Datos incorrectos");
+    const editorModal = document.getElementById('editorModal');
+    const closeEditor = document.getElementById('closeEditor');
+    const saveLevel = document.getElementById('saveLevel');
+    const exportLevel = document.getElementById('exportLevel');
+    const importLevelBtn = document.getElementById('importLevelBtn');
+    const levelJSON = document.getElementById('levelJSON');
+    const edSpeed = document.getElementById('edSpeed');
+    const edInterval = document.getElementById('edInterval');
+    const addBlock = document.getElementById('addBlock');
+    const addSpike = document.getElementById('addSpike');
+
+    // --- Canvas resize ---
+    let W = innerWidth, H = innerHeight;
+    let ground;
+    function resize(){
+      W = canvas.width = innerWidth;
+      H = canvas.height = innerHeight;
+      ground = H - Math.max(80, Math.floor(H * 0.12));
     }
-}
+    addEventListener('resize', resize);
+    resize();
 
-function logout(){
-    document.getElementById("contentBox").classList.add("hidden");
-    document.getElementById("loginBox").classList.remove("hidden");
-}
-</script>
+    // --- Game state ---
+    let running = false;
+    let paused = false;
+    let lastTime = 0;
+    let spawnTimer = 0;
+    let obstacleInterval = 2000;
+    let baseSpeed = 6;
+    let speedMultiplier = 1;
+    let distance = 0;
+    let best = parseInt(localStorage.getItem('neondash_best') || '0', 10);
+    bestScoreEl.textContent = best;
 
-</body>
-</html>
+    // --- Player ---
+    const player = {
+      x: 120,
+      y: ground - 60,
+      size: 50,
+      dy: 0,
+      gravity: 1.1,
+      jumpForce: -16,
+      grounded: true,
+      rotation: 0
+    };
+
+    // --- Obstacles & particles ---
+    let obstacles = [];
+    let particles = [];
+
+    // --- Level object (editable) ---
+    let level = {
+      speed: baseSpeed,
+      interval: obstacleInterval,
+      spawnPattern: []
+    };
+
+    // --- Controls & input ---
+    function jump(){
+      if (!running || paused) return;
+      if (player.grounded){
+        player.dy = player.jumpForce;
+        player.grounded = false;
+        spawnParticles(player.x + player.size/2, player.y + player.size, 12);
+      }
+    }
+    addEventListener('keydown', e=>{
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!running) startGame();
+        jump();
+      } else if (e.code === 'KeyP'){
+        togglePause();
+      }
+    });
+    canvas.addEventListener('mousedown', e=>{
+      if (!running) startGame();
+      jump();
+    });
+    canvas.addEventListener('touchstart', e=>{
+      e.preventDefault();
+      if (!running) startGame();
+      jump();
+    }, {passive:false});
+
+    btnStart.addEventListener('click', ()=>startGame());
+    pauseBtn.addEventListener('click', ()=>togglePause());
+    restartBtn.addEventListener('click', ()=>resetGame());
+    btnEditor.addEventListener('click', ()=>openEditor());
+    closeEditor.addEventListener('click', ()=>closeEditorModal());
+    toggleMusic.addEventListener('change', e=>{
+      if (toggleMusic.checked) {
+        try { bgm.play(); } catch(e){}
+      } else {
+        bgm.pause();
+      }
+    });
+
+    // --- Particle system ---
+    function spawnParticles(x,y,n){
+      for(let i=0;i<n;i++){
+        particles.push({
+          x, y,
+          vx: (Math.random()-0.5)*6,
+          vy: -Math.random()*6 - 1,
+          life: 40 + Math.random()*30,
+          size: 2 + Math.random()*4
+        });
+      }
+    }
+
+    // --- Obstacles generator ---
+    function spawnObstacle(type='block', custom={}){
+      const gapFromRight = 20 + Math.random()*40;
+      const baseY = ground;
+      if (type === 'block'){
+        const h = custom.height ?? (40 + Math.random()*110);
+        const w = custom.width ?? (30 + Math.random()*60);
+        obstacles.push({
+          type:'block', x: W + gapFromRight, y: baseY - h, width: w, height: h
+        });
+      } else if (type === 'spike'){
+        const size = custom.size ?? (40 + Math.random()*30);
+        obstacles.push({
+          type:'spike', x: W + gapFromRight, y: baseY, size
+        });
+      } else if (type === 'moving'){
+        const h = 40 + Math.random()*80;
+        const w = 30 + Math.random()*40;
+        const ybase = baseY - h - (Math.random()*140);
+        obstacles.push({
+          type:'moving', x: W + gapFromRight, y: ybase, width:w, height:h,
+          dir: Math.random()>0.5?1:-1, r: 0
+        });
+      }
+    }
+
+    // --- Collision helpers ---
+    function rectRect(a,b){
+      return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
+    }
+    function pointInTriangle(px,py, ax,ay, bx,by, cx,cy){
+      const v0x = cx-ax, v0y = cy-ay;
+      const v1x = bx-ax, v1y = by-ay;
+      const v2x = px-ax, v2y = py-ay;
+      const dot00 = v0x*v0x + v0y*v0y;
+      const dot01 = v0x*v1x + v0y*v1y;
+      const dot02 = v0x*v2x + v0y*v2y;
+      const dot11 = v1x*v1x + v1y*v1y;
+      const dot12 = v1x*v2x + v1y*v2y;
+      const invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
+      const u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+      const v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+      return (u >= 0) && (v >= 0) && (u + v < 1);
+    }
+
+    // --- Reset / start / gameover / pause ---
+    function resetGame(){
+      running = false;
+      paused = false;
+      lastTime = 0;
+      spawnTimer = 0;
+      obstacles = [];
+      particles = [];
+      distance = 0;
+      speedMultiplier = 1;
+      player.y = ground - player.size;
+      player.dy = 0;
+      player.grounded = true;
+      menu.classList.remove('hidden');
+      hud.classList.add('hidden');
+      title.classList.remove('hidden');
+      if (toggleMusic.checked) bgm.pause();
+    }
+
+    function startGame(){
+      running = true;
+      paused = false;
+      menu.classList.add('hidden');
+      title.classList.add('hidden');
+      hud.classList.remove('hidden');
+      if (toggleMusic.checked) {
+        try { bgm.currentTime = 0; bgm.play(); } catch(e){}
+      }
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+
+    function gameOver(){
+      running = false;
+      hud.classList.add('hidden');
+      menu.classList.remove('hidden');
+      title.classList.remove('hidden');
+      if (distance > best){
+        best = Math.floor(distance);
+        localStorage.setItem('neondash_best', best);
+        bestScoreEl.textContent = best;
+      }
+      if (toggleMusic.checked) bgm.pause();
+      spawnParticles(player.x + player.size/2, player.y + player.size/2, 36);
+    }
+
+    function togglePause(){
+      if (!running) return;
+      paused = !paused;
+      if (!paused) {
+        lastTime = performance.now();
+        if (toggleMusic.checked) bgm.play();
+        requestAnimationFrame(loop);
+      } else {
+        if (toggleMusic.checked) bgm.pause();
+      }
+    }
+
+    // --- Editor functions ---
+    function openEditor(){
+      editorModal.classList.remove('hidden');
+      levelJSON.value = JSON.stringify(level, null, 2);
+    }
+    function closeEditorModal(){
+      editorModal.classList.add('hidden');
+    }
+    addBlock.addEventListener('click', ()=> {
+      level.spawnPattern.push({type:'block', width:60, height:80, xOffset:0});
+      levelJSON.value = JSON.stringify(level, null, 2);
+    });
+    addSpike.addEventListener('click', ()=> {
+      level.spawnPattern.push({type:'spike', size:48, xOffset:0});
+      levelJSON.value = JSON.stringify(level, null, 2);
+    });
+    exportLevel.addEventListener('click', ()=> {
+      levelJSON.value = JSON.stringify(level, null, 2);
+    });
+    importLevelBtn.addEventListener('click', ()=> {
+      try {
+        const parsed = JSON.parse(levelJSON.value);
+        level = parsed;
+        alert('Nivel importado (no olvides Guardar).');
+      } catch(e){
+        alert('JSON inválido');
+      }
+    });
+    saveLevel.addEventListener('click', ()=> {
+      try {
+        const parsed = JSON.parse(levelJSON.value);
+        level = parsed;
+        baseSpeed = level.speed || baseSpeed;
+        obstacleInterval = level.interval || obstacleInterval;
+        alert('Nivel guardado y aplicado.');
+        closeEditorModal();
+      } catch(e) {
+        alert('Error: JSON inválido.');
+      }
+    });
+
+    // --- Main loop ---
+    function loop(ts){
+      if (!running || paused) return;
+      const dt = Math.min(50, ts - lastTime);
+      lastTime = ts;
+
+      const speed = (baseSpeed * speedMultiplier);
+      distance += (speed * dt) * 0.01;
+      scoreEl.textContent = Math.floor(distance);
+
+      speedMultiplier = 1 + Math.min(2.5, distance / 1200);
+
+      spawnTimer += dt;
+      const intervalNow = level.interval || obstacleInterval;
+      if (spawnTimer > intervalNow){
+        spawnTimer = 0;
+        if (level.spawnPattern && level.spawnPattern.length){
+          const p = level.spawnPattern[Math.floor(Math.random()*level.spawnPattern.length)];
+          spawnObstacle(p.type, p);
+        } else {
+          const r = Math.random();
+          if (r < 0.12) spawnObstacle('moving');
+          else if (r < 0.38) spawnObstacle('spike');
+          else spawnObstacle('block');
+        }
+      }
+
+      // physics
+      player.dy += player.gravity;
+      player.y += player.dy * (dt/16);
+      player.rotation += player.dy * 0.02;
+
+      if (player.y + player.size >= ground){
+        player.y = ground - player.size;
+        player.dy = 0;
+        player.grounded = true;
+        player.rotation = 0;
+      }
+
+      for (let i = obstacles.length -1; i>=0; i--){
+        const o = obstacles[i];
+        const move = speed * (dt/16);
+        o.x -= move;
+        if (o.type === 'moving'){
+          o.r += 0.03 * (dt/16);
+          o.y += Math.sin(o.r) * 0.8 * (dt/16) * 10;
+        }
+        if (o.x + (o.width || o.size) < -200) obstacles.splice(i,1);
+      }
+
+      for (let i = particles.length -1; i>=0; i--){
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.18;
+        p.life -= 1;
+        if (p.life <= 0) particles.splice(i,1);
+      }
+
+      const box = { x: player.x, y: player.y, w: player.size, h: player.size };
+
+      for (const o of obstacles){
+        if (o.type === 'block' || o.type === 'moving'){
+          const rect = { x: o.x, y: o.y, w: o.width, h: o.height };
+          if (rectRect({x:box.x, w:box.w, y:box.y, h:box.h}, rect)){
+            gameOver();
+            return;
+          }
+        } else if (o.type === 'spike'){
+          const sx = o.x, sSize = o.size, sy = o.y;
+          const corners = [
+            [box.x, box.y],
+            [box.x + box.w, box.y],
+            [box.x, box.y + box.h],
+            [box.x + box.w, box.y + box.h]
+          ];
+          let collided = false;
+          for (const [cx,cy] of corners){
+            if (pointInTriangle(cx, cy, sx, sy, sx + sSize/2, sy - sSize, sx + sSize, sy)){
+              collided = true; break;
+            }
+          }
+          if (collided){
+            gameOver();
+            return;
+          }
+        }
+      }
+
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // --- Drawing functions ---
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      drawGradientBackground();
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(0, ground, W, H - ground);
+
+      for (const o of obstacles){
+        if (o.type === 'block' || o.type === 'moving'){
+          drawNeonRect(o.x, o.y, o.width, o.height, '#ff4d6d');
+        } else if (o.type === 'spike'){
+          drawNeonSpike(o.x, o.y, o.size);
+        }
+      }
+
+      drawRotatingCube(player.x, player.y, player.size, player.rotation);
+
+      for (const p of particles){
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.life / 60);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawGradientBackground(){
+      const g = ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, 'rgba(0,0,0,0.4)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,W,H);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+      ctx.lineWidth = 1;
+      for (let i=0;i<20;i++){
+        ctx.beginPath();
+        ctx.moveTo(0, i*(H/20));
+        ctx.lineTo(W, i*(H/20));
+        ctx.stroke();
+      }
+    }
+
+    function drawNeonRect(x,y,w,h, color){
+      ctx.save();
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = color || '#00f0ff';
+      ctx.fillStyle = color || '#00f0ff';
+      roundRect(ctx, x, y, w, h, 6);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      roundRect(ctx, x + 3, y + 3, Math.max(0,w-6), Math.max(0,h-6), 4);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawNeonSpike(x, groundY, size){
+      ctx.save();
+      const spikeColor = '#ffd24d';
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = spikeColor;
+      ctx.fillStyle = spikeColor;
+      ctx.beginPath();
+      ctx.moveTo(x, groundY);
+      ctx.lineTo(x + size/2, groundY - size);
+      ctx.lineTo(x + size, groundY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function roundRect(ctx,x,y,w,h,r){
+      ctx.beginPath();
+      ctx.moveTo(x+r,y);
+      ctx.arcTo(x+w,y,x+w,y+h,r);
+      ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r);
+  
