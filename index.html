@@ -22,8 +22,9 @@
     html,body{height:100%;margin:0;background:radial-gradient(circle at 10% 10%, rgba(0,255,255,0.03), transparent 10%), var(--bg); font-family:var(--font); color:#fff; -webkit-font-smoothing:antialiased}
     canvas{display:block; position:fixed; inset:0; width:100%; height:100%}
 
+    /* allow pointer events so buttons receive clicks */
     #ui{
-      position:fixed; z-index:40; inset:0; pointer-events:none;
+      position:fixed; z-index:40; inset:0; pointer-events:auto;
       display:flex; align-items:flex-start; justify-content:center; padding:28px;
     }
 
@@ -93,7 +94,8 @@
     <div id="title">NEON DASH</div>
 
     <div id="menu">
-      <button id="btnStart" class="neon-btn">Jugar</button>
+      <!-- botón asegura llamado directo por onclick -->
+      <button id="btnStart" class="neon-btn" onclick="startGame()">Jugar</button>
       <button id="btnEditor" class="neon-btn">Editor de niveles</button>
       <label class="neon-toggle">
         <input id="toggleMusic" type="checkbox" checked>
@@ -144,9 +146,9 @@
   <audio id="bgm" src="bgm.mp3" loop crossorigin="anonymous"></audio>
 
   <!-- ============================
-       JS (todo inline, tipo módulo)
+       JS (todo inline, SIN type="module")
        ============================ -->
-  <script type="module">
+  <script>
     // --- Referencias DOM ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -229,7 +231,7 @@
         spawnParticles(player.x + player.size/2, player.y + player.size, 12);
       }
     }
-    addEventListener('keydown', e=>{
+    addEventListener('keydown', function(e){
       if (e.code === 'Space') {
         e.preventDefault();
         if (!running) startGame();
@@ -238,22 +240,23 @@
         togglePause();
       }
     });
-    canvas.addEventListener('mousedown', e=>{
+    canvas.addEventListener('mousedown', function(e){
       if (!running) startGame();
       jump();
     });
-    canvas.addEventListener('touchstart', e=>{
+    canvas.addEventListener('touchstart', function(e){
       e.preventDefault();
       if (!running) startGame();
       jump();
     }, {passive:false});
 
-    btnStart.addEventListener('click', ()=>startGame());
-    pauseBtn.addEventListener('click', ()=>togglePause());
-    restartBtn.addEventListener('click', ()=>resetGame());
-    btnEditor.addEventListener('click', ()=>openEditor());
-    closeEditor.addEventListener('click', ()=>closeEditorModal());
-    toggleMusic.addEventListener('change', e=>{
+    // Attach event listeners to UI (safe even if button has onclick)
+    btnStart.addEventListener('click', function(){ if (!running) startGame(); });
+    pauseBtn.addEventListener('click', function(){ togglePause(); });
+    restartBtn.addEventListener('click', function(){ resetGame(); });
+    btnEditor.addEventListener('click', function(){ openEditor(); });
+    closeEditor.addEventListener('click', function(){ closeEditorModal(); });
+    toggleMusic.addEventListener('change', function(e){
       if (toggleMusic.checked) {
         try { bgm.play(); } catch(e){}
       } else {
@@ -385,18 +388,18 @@
     function closeEditorModal(){
       editorModal.classList.add('hidden');
     }
-    addBlock.addEventListener('click', ()=> {
+    addBlock.addEventListener('click', function(){ 
       level.spawnPattern.push({type:'block', width:60, height:80, xOffset:0});
       levelJSON.value = JSON.stringify(level, null, 2);
     });
-    addSpike.addEventListener('click', ()=> {
+    addSpike.addEventListener('click', function(){ 
       level.spawnPattern.push({type:'spike', size:48, xOffset:0});
       levelJSON.value = JSON.stringify(level, null, 2);
     });
-    exportLevel.addEventListener('click', ()=> {
+    exportLevel.addEventListener('click', function(){ 
       levelJSON.value = JSON.stringify(level, null, 2);
     });
-    importLevelBtn.addEventListener('click', ()=> {
+    importLevelBtn.addEventListener('click', function(){ 
       try {
         const parsed = JSON.parse(levelJSON.value);
         level = parsed;
@@ -405,7 +408,7 @@
         alert('JSON inválido');
       }
     });
-    saveLevel.addEventListener('click', ()=> {
+    saveLevel.addEventListener('click', function(){ 
       try {
         const parsed = JSON.parse(levelJSON.value);
         level = parsed;
@@ -495,7 +498,8 @@
             [box.x + box.w, box.y + box.h]
           ];
           let collided = false;
-          for (const [cx,cy] of corners){
+          for (const c of corners){
+            const cx = c[0], cy = c[1];
             if (pointInTriangle(cx, cy, sx, sy, sx + sSize/2, sy - sSize, sx + sSize, sy)){
               collided = true; break;
             }
@@ -577,18 +581,4 @@
       ctx.shadowColor = spikeColor;
       ctx.fillStyle = spikeColor;
       ctx.beginPath();
-      ctx.moveTo(x, groundY);
-      ctx.lineTo(x + size/2, groundY - size);
-      ctx.lineTo(x + size, groundY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function roundRect(ctx,x,y,w,h,r){
-      ctx.beginPath();
-      ctx.moveTo(x+r,y);
-      ctx.arcTo(x+w,y,x+w,y+h,r);
-      ctx.arcTo(x+w,y+h,x,y+h,r);
-      ctx.arcTo(x,y+h,x,y,r);
-  
+      
