@@ -2,91 +2,140 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Neon Dash — Puro Juego</title>
+  <!-- Viewport optimizado para móvil (sin zoom accidental) -->
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Neon Dash — Mobile (Chrome)</title>
+
   <style>
-    html,body{height:100%;margin:0;background:#06060a;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#fff;overflow:hidden}
-    canvas{display:block;width:100%;height:100%}
-    /* Mensaje central (se pinta en canvas, esto es solo por seguridad si canvas falla) */
-    #fallback {
-      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-      pointer-events:none;font-weight:700;color:#88f;opacity:.02;
+    :root{
+      --bg:#06060a;
+      --neon1:#00f0ff;
+      --neon2:#ff00d0;
     }
+    html,body{
+      height:100%; margin:0; background:linear-gradient(180deg,#071019,#05050a);
+      -webkit-font-smoothing:antialiased; -webkit-touch-callout:none;
+      -webkit-user-select:none; -ms-user-select:none; user-select:none;
+      overscroll-behavior: none;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    /* canvas ocupa toda la pantalla; usamos devicePixelRatio para nitidez */
+    canvas{ display:block; width:100%; height:100%; touch-action:none; -webkit-tap-highlight-color: transparent; }
+
+    /* overlay de "Tap to start" y controles mínimos */
+    #overlay {
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      z-index:50; pointer-events:none;
+    }
+    #overlay .card {
+      pointer-events:auto;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.04);
+      padding:12px 18px; border-radius:12px; text-align:center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      color: #fff;
+    }
+    #playAudio {
+      display:inline-block; margin-top:8px; padding:8px 12px; border-radius:10px; border:none;
+      background: linear-gradient(90deg,var(--neon1),var(--neon2)); color:#000; font-weight:700; cursor:pointer;
+    }
+
+    /* little debug / hint */
+    #hint { position:fixed; left:10px; bottom:10px; z-index:55; color:rgba(255,255,255,0.75); font-size:12px; }
+
+    /* if user wants to attach an external audio file, keep its element invisible */
+    audio{ display:none }
   </style>
 </head>
 <body>
-  <canvas id="c"></canvas>
-  <div id="fallback">Toque / Click / Espacio</div>
 
-  <script>
-  // --- Variables y setup ---
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d', {alpha:true});
-  let W = innerWidth, H = innerHeight;
-  function resize(){ W = canvas.width = innerWidth; H = canvas.height = innerHeight; ground = H - Math.max(72, Math.floor(H*0.12)); }
-  addEventListener('resize', resize);
-  resize();
+  <canvas id="canvas"></canvas>
 
-  // estado
-  let running = false;
-  let paused = false;
+  <div id="overlay" aria-hidden="false">
+    <div class="card" id="card">
+      <div style="font-weight:800; letter-spacing:4px; font-size:18px">NEON DASH</div>
+      <div style="font-size:13px; opacity:0.9; margin-top:6px">Toca la pantalla / Press SPACE para empezar</div>
+      <button id="playAudio" style="display:none">Activar música</button>
+    </div>
+  </div>
+
+  <div id="hint">Swipe/Zoom bloqueado para evitar doble toque</div>
+
+  <!-- Pon bgm.mp3 en la misma carpeta si quieres música -->
+  <audio id="bgm" src="bgm.mp3" loop crossorigin="anonymous"></audio>
+
+<script>
+/* ============================
+   Neon Dash - Mobile optimized
+   ============================ */
+
+(function(){
+  // DOM
+  const canvas = document.getElementById('canvas');
+  const overlay = document.getElementById('overlay');
+  const card = document.getElementById('card');
+  const playAudioBtn = document.getElementById('playAudio');
+  const bgm = document.getElementById('bgm');
+
+  // HiDPI scaling
+  let DPR = Math.max(1, window.devicePixelRatio || 1);
+  function fitCanvas(){
+    DPR = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.floor(window.innerWidth * DPR);
+    canvas.height = Math.floor(window.innerHeight * DPR);
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ground = Math.max(72, Math.floor(window.innerHeight * 0.12));
+  }
+
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let ground = Math.max(72, Math.floor(window.innerHeight * 0.12));
+  fitCanvas();
+  addEventListener('resize', fitCanvas);
+
+  // game state
+  let running = false, paused = false;
   let lastTime = 0;
-  let spawnTimer = 0;
-  let spawnInterval = 1400; // ms
-  let baseSpeed = 6;
-  let speedMul = 1;
-  let dist = 0;
-  let best = parseInt(localStorage.getItem('neon_best')||'0',10) || 0;
+  let spawnTimer = 0, spawnInterval = 1200;
+  let baseSpeed = 6, speedMul = 1;
+  let score = 0, best = parseInt(localStorage.getItem('neon_best')||'0',10) || 0;
 
-  // suelo
-  let ground = H - Math.max(72, Math.floor(H*0.12));
+  // player
+  const player = { x: 96, y: ground - 56, size: 56, dy:0, gravity:1.15, jump:-16, grounded:true, rot:0 };
 
-  // jugador (cubo)
-  const player = {
-    x: 100,
-    y: ground - 56,
-    size: 56,
-    dy: 0,
-    gravity: 1.2,
-    jumpForce: -16,
-    grounded: true,
-    rot: 0
-  };
+  // world
+  let obstacles = [], particles = [];
 
-  // obstaculos y particulas
-  let obstacles = [];
-  let particles = [];
+  // helpers
+  function rand(a,b){ return a + Math.random()*(b-a) }
 
-  // util: spawnear obstaculos
   function spawnObstacle(){
     const r = Math.random();
-    const gap = 20 + Math.random()*60;
-    const baseY = ground;
-    if (r < 0.35){
-      // bloque
-      const h = 40 + Math.random()*100;
-      const w = 28 + Math.random()*56;
-      obstacles.push({type:'block', x: W + gap, y: baseY - h, w, h});
+    const gap = 18 + Math.random()*48;
+    if (r < 0.36){
+      const h = 40 + Math.random()*98;
+      const w = 26 + Math.random()*56;
+      obstacles.push({ type:'block', x: window.innerWidth + gap, y: ground - h, w, h });
     } else {
-      // pico triangular
-      const size = 36 + Math.random()*48;
-      obstacles.push({type:'spike', x: W + gap, y: baseY, size});
+      const s = 36 + Math.random()*48;
+      obstacles.push({ type:'spike', x: window.innerWidth + gap, y: ground, size: s });
     }
   }
 
-  // particulas simples
   function spawnParticles(x,y,n){
     for(let i=0;i<n;i++){
-      particles.push({x,y,vx:(Math.random()-0.5)*5, vy:-Math.random()*5-1, life:30+Math.random()*30, s:1+Math.random()*3});
+      particles.push({ x, y, vx:(Math.random()-0.5)*5, vy:-Math.random()*5-1, life:30+Math.random()*30, s:1+Math.random()*3 });
     }
   }
 
-  // colisiones AABB
   function rectsCollide(a,b){
     return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
   }
 
-  // punto en triángulo (para spikes)
   function pointInTriangle(px,py, ax,ay, bx,by, cx,cy){
     const v0x = cx-ax, v0y = cy-ay;
     const v1x = bx-ax, v1y = by-ay;
@@ -102,107 +151,102 @@
     return (u >= 0) && (v >= 0) && (u + v < 1);
   }
 
-  // --- controls: primer input inicia el juego ---
+  // control helpers
   function jump(){
     if (!running || paused) return;
     if (player.grounded){
-      player.dy = player.jumpForce;
+      player.dy = player.jump;
       player.grounded = false;
       spawnParticles(player.x + player.size/2, player.y + player.size, 10);
     }
   }
 
-  addEventListener('keydown', e=>{
-    if (e.code === 'Space'){
-      e.preventDefault();
-      if (!running) startGame();
-      jump();
-    } else if (e.code === 'KeyP'){
-      togglePause();
+  // Start on first user interaction (important for mobile audio unlock)
+  let firstInteractionDone = false;
+  function onFirstInteraction(e){
+    if (!firstInteractionDone){
+      firstInteractionDone = true;
+      // prevent default for touch so we avoid double-tap zoom etc.
+      if (e && e.type === 'touchstart') e.preventDefault();
+      // show audio play button only if audio file is provided
+      if (bgm && bgm.src && !bgm.src.endsWith('bgm.mp3') && bgm.src.trim() !== '') {
+        // if user provided a bgm file, show play button (but usually it is bgm.mp3 — keep logic minimal)
+      }
+      // remove overlay instruction but keep card until play
+      overlay.style.pointerEvents = 'none';
     }
-  });
+  }
 
-  canvas.addEventListener('mousedown', e=>{
-    if (!running) startGame();
-    jump();
-  });
-  canvas.addEventListener('touchstart', e=>{
-    e.preventDefault();
-    if (!running) startGame();
-    jump();
-  }, {passive:false});
+  // input listeners (non-passive to allow preventDefault)
+  document.addEventListener('touchstart', function(e){ onFirstInteraction(e); if (!running) startGame(); jump(); }, {passive:false});
+  document.addEventListener('mousedown', function(e){ onFirstInteraction(e); if (!running) startGame(); jump(); });
+  document.addEventListener('keydown', function(e){ if (e.code === 'Space'){ e.preventDefault(); if (!running) startGame(); jump(); } if (e.code === 'KeyP') togglePause(); });
 
-  // --- start / reset / gameover ---
-  function resetGame(){
-    running = false;
-    paused = false;
-    lastTime = 0;
-    spawnTimer = 0;
-    obstacles = [];
-    particles = [];
-    dist = 0;
-    speedMul = 1;
-    player.y = ground - player.size;
-    player.dy = 0;
-    player.grounded = true;
-    player.rot = 0;
+  // audio unlock button (shown only if user wants to start music separately)
+  // We keep it hidden by default; if you include bgm.mp3, Chrome mobile still requires a user gesture — starting the game with touch will allow bgm.play() inside startGame()
+  playAudioBtn.addEventListener('click', function(){ try{ bgm.play(); playAudioBtn.style.display = 'none'; } catch(e){ alert('No se pudo reproducir audio automáticamente.'); } });
+
+  // game lifecycle
+  function reset(){
+    running = false; paused = false; lastTime = 0; spawnTimer = 0; spawnInterval = 1200;
+    baseSpeed = 6; speedMul = 1; score = 0;
+    obstacles = []; particles = [];
+    player.y = ground - player.size; player.dy = 0; player.grounded = true; player.rot = 0;
+    overlay.style.display = ''; overlay.setAttribute('aria-hidden','false');
   }
 
   function startGame(){
     if (running) return;
-    running = true;
-    paused = false;
-    lastTime = performance.now();
-    // spawn some initial obstacles so it doesn't feel empty
-    obstacles = [];
-    for(let i=0;i<2;i++) spawnObstacle();
+    running = true; paused = false; lastTime = performance.now();
+    // try to start audio if present (user gesture has occurred)
+    try { if (bgm && bgm.src) bgm.play().catch(()=>{}); } catch(e){}
+    // initial obstacles so it feels alive
+    obstacles = []; for(let i=0;i<2;i++){ spawnObstacle(); }
+    overlay.style.display = 'none';
     requestAnimationFrame(loop);
   }
 
   function gameOver(){
     running = false;
-    // guarda mejor puntuación
-    const sc = Math.floor(dist);
-    if (sc > best){ best = sc; localStorage.setItem('neon_best', best); }
-    // pequeña explosión
-    spawnParticles(player.x + player.size/2, player.y + player.size/2, 30);
-    // reinicia después de un segundo (para probar)
-    setTimeout(()=>resetGame(), 700);
+    // simple score store
+    const sc = Math.floor(score);
+    if (sc > best){ best = sc; try{ localStorage.setItem('neon_best', best); }catch(e){} }
+    // particle burst
+    spawnParticles(player.x + player.size/2, player.y + player.size/2, 28);
+    // show overlay to let user restart
+    overlay.style.display = ''; overlay.setAttribute('aria-hidden','false');
+    card.innerHTML = '<div style="font-weight:800; font-size:18px">GAME OVER</div><div style="margin-top:8px">Score: '+sc+' · Best: '+best+'</div><div style="margin-top:10px"><button id="replay" style="padding:8px 12px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--neon1),var(--neon2));color:#000;font-weight:700;cursor:pointer">Reintentar</button></div>';
+    // attach replay
+    document.getElementById('replay').addEventListener('click', function(){ card.innerHTML = '<div style=\"font-weight:800; letter-spacing:4px; font-size:18px\">NEON DASH</div><div style=\"font-size:13px; opacity:0.9; margin-top:6px\">Toca la pantalla / Press SPACE para empezar</div>'; reset(); });
   }
 
   function togglePause(){
     if (!running) return;
     paused = !paused;
-    if (!paused){
-      lastTime = performance.now();
-      requestAnimationFrame(loop);
-    }
+    if (!paused){ lastTime = performance.now(); requestAnimationFrame(loop); }
   }
 
-  // --- bucle principal ---
+  // main loop
   function loop(ts){
     if (!running || paused) return;
     const dt = Math.min(50, ts - lastTime);
     lastTime = ts;
 
     const speed = baseSpeed * speedMul;
-    dist += (speed * dt) * 0.01;
-    // dificultad progresiva
-    speedMul = 1 + Math.min(2.2, dist/900);
+    score += (speed * dt) * 0.01;
+    speedMul = 1 + Math.min(2.3, score / 900);
 
-    // spawn
     spawnTimer += dt;
     if (spawnTimer > spawnInterval){
       spawnTimer = 0;
       spawnObstacle();
-      // pequeño random del intervalo para variedad
-      spawnInterval = 1000 + Math.random()*900;
+      spawnInterval = 900 + Math.random()*900;
     }
 
-    // fisica jugador
+    // player physics
     player.dy += player.gravity;
     player.y += player.dy * (dt/16);
-    player.rot += player.dy * 0.015;
+    player.rot += player.dy * 0.018;
     if (player.y + player.size >= ground){
       player.y = ground - player.size;
       player.dy = 0;
@@ -210,14 +254,14 @@
       player.rot = 0;
     }
 
-    // mover obstaculos
+    // obstacles move
     for (let i = obstacles.length -1; i >= 0; i--){
       const o = obstacles[i];
       o.x -= speed * (dt/16);
-      if (o.x + (o.w || o.size) < -120) obstacles.splice(i,1);
+      if (o.x + (o.w || o.size) < -140) obstacles.splice(i,1);
     }
 
-    // particulas
+    // particles update
     for (let i = particles.length -1; i >= 0; i--){
       const p = particles[i];
       p.x += p.vx;
@@ -227,32 +271,19 @@
       if (p.life <= 0) particles.splice(i,1);
     }
 
-    // colisiones
-    const box = {x:player.x, y:player.y, w:player.size, h:player.size};
+    // collisions (player box vs obstacles)
+    const box = { x: player.x, y: player.y, w: player.size, h: player.size };
     for (const o of obstacles){
       if (o.type === 'block'){
-        const rect = {x:o.x, y:o.y, w:o.w, h:o.h};
-        if (rectsCollide({x:box.x, y:box.y, w:box.w, h:box.h}, rect)){
-          gameOver();
-          return;
-        }
-      } else if (o.type === 'spike'){
-        // triángulo en puntos A (o.x, o.y), B (o.x + size/2, o.y - size), C (o.x + size, o.y)
+        const r = { x:o.x, y:o.y, w:o.w, h:o.h };
+        if (rectsCollide({x:box.x,y:box.y,w:box.w,h:box.h}, r)){ gameOver(); return; }
+      } else {
         const ax = o.x, ay = o.y;
         const bx = o.x + o.size/2, by = o.y - o.size;
         const cx = o.x + o.size, cy = o.y;
-        // chequea esquinas del cubo
-        const corners = [
-          [box.x, box.y],
-          [box.x + box.w, box.y],
-          [box.x, box.y + box.h],
-          [box.x + box.w, box.y + box.h]
-        ];
+        const corners = [[box.x,box.y],[box.x+box.w,box.y],[box.x,box.y+box.h],[box.x+box.w,box.y+box.h]];
         for (const [px,py] of corners){
-          if (pointInTriangle(px,py, ax,ay, bx,by, cx,cy)){
-            gameOver();
-            return;
-          }
+          if (pointInTriangle(px,py, ax,ay, bx,by, cx,cy)){ gameOver(); return; }
         }
       }
     }
@@ -261,116 +292,108 @@
     requestAnimationFrame(loop);
   }
 
-  // --- dibujo ---
+  // draw
   function draw(){
-    // clear
-    ctx.clearRect(0,0,W,H);
+    // clear (use CSS px space - ctx transform handles DPR)
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    // fondo sutil
+    // background gradient
+    const H = window.innerHeight;
+    const W = window.innerWidth;
     const g = ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,'#071019');
     g.addColorStop(1,'#05050a');
     ctx.fillStyle = g;
     ctx.fillRect(0,0,W,H);
 
-    // grid lineas
+    // grid lines subtle
     ctx.strokeStyle = 'rgba(255,255,255,0.02)';
     ctx.lineWidth = 1;
     for (let i=0;i<18;i++){
-      ctx.beginPath();
-      ctx.moveTo(0, i*(H/18));
-      ctx.lineTo(W, i*(H/18));
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i*(H/18)); ctx.lineTo(W, i*(H/18)); ctx.stroke();
     }
 
     // ground
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(0, ground, W, H - ground);
 
-    // obstaculos
+    // obstacles
     for (const o of obstacles){
       if (o.type === 'block'){
-        // neon rect
         ctx.save();
-        ctx.shadowBlur = 16; ctx.shadowColor = '#ff5a6a';
+        ctx.shadowBlur = 14; ctx.shadowColor = '#ff6b80';
         ctx.fillStyle = '#ff6b80';
-        roundRect(ctx, o.x, o.y, o.w, o.h, 6); ctx.fill();
+        roundRect(ctx, o.x, o.y, o.w, o.h, 8); ctx.fill();
         ctx.restore();
       } else if (o.type === 'spike'){
         ctx.save();
-        ctx.shadowBlur = 14; ctx.shadowColor = '#ffd24d';
-        ctx.fillStyle = '#ffda6b';
+        ctx.shadowBlur = 12; ctx.shadowColor = '#ffd24d';
+        ctx.fillStyle = '#ffd24d';
         ctx.beginPath();
         ctx.moveTo(o.x, o.y);
         ctx.lineTo(o.x + o.size/2, o.y - o.size);
         ctx.lineTo(o.x + o.size, o.y);
-        ctx.closePath();
-        ctx.fill();
+        ctx.closePath(); ctx.fill();
         ctx.restore();
       }
     }
 
-    // jugador (cubo rotando)
+    // player cube rotated
     ctx.save();
     const cx = player.x + player.size/2, cy = player.y + player.size/2;
-    ctx.translate(cx, cy);
-    ctx.rotate(player.rot * 0.08);
+    ctx.translate(cx, cy); ctx.rotate(player.rot * 0.08);
     ctx.shadowBlur = 22; ctx.shadowColor = '#00f0ff';
     ctx.fillStyle = '#00e8ff';
-    roundRect(ctx, -player.size/2, -player.size/2, player.size, player.size, 8);
-    ctx.fill();
+    roundRect(ctx, -player.size/2, -player.size/2, player.size, player.size, 8); ctx.fill();
     ctx.restore();
 
-    // particulas
+    // particles
     for (const p of particles){
       ctx.save();
-      ctx.globalAlpha = Math.max(0, p.life/60);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.s, 0, Math.PI*2);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      ctx.fill();
+      ctx.globalAlpha = Math.max(0, p.life / 60);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fill();
       ctx.restore();
     }
 
-    // HUD: puntuación y mejor
+    // HUD
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.font = '20px system-ui, Arial';
-    ctx.fillText('Score: ' + Math.floor(dist), 18, 30);
-    ctx.fillText('Best: ' + best, 18, 56);
+    ctx.fillText('Score: ' + Math.floor(score), 16, 28);
+    ctx.fillText('Best: ' + best, 16, 54);
 
-    // Si no está corriendo, pintamos mensaje central
+    // start hint if not running
     if (!running){
       ctx.save();
       ctx.fillStyle = 'rgba(255,255,255,0.02)';
       ctx.fillRect(W/2 - 160, H/2 - 54, 320, 100);
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
-      ctx.font = '600 20px system-ui, Arial';
+      ctx.font = '700 18px system-ui, Arial';
       ctx.fillText('Toca / Click / Espacio para empezar', W/2, H/2 - 6);
       ctx.font = '14px system-ui, Arial';
-      ctx.fillText('Salta con toque o tecla ESPACIO. Se reinicia al morir.', W/2, H/2 + 18);
+      ctx.fillText('Salta con toque o tecla ESPACIO. Reinicia al morir.', W/2, H/2 + 18);
       ctx.restore();
     }
   }
 
-  // helper roundRect
   function roundRect(ctx,x,y,w,h,r){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
   }
 
-  // arranco con reset listo
-  resetGame();
+  // pause if tab hidden (saves battery)
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden && running) paused = true;
+    if (!document.hidden && paused) { paused = false; lastTime = performance.now(); requestAnimationFrame(loop); }
+  });
+
+  // initial reset & draw
+  reset();
   draw();
 
-  // expose for debug (opc)
-  try { window.startGame = startGame; window.resetGame = resetGame; } catch(e){}
+  // expose start/reset for debugging if needed (safe)
+  try { window.startGame = startGame; window.resetGame = reset; } catch(e){}
+})();
+</script>
 
-  </script>
 </body>
 </html>
