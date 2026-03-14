@@ -1,900 +1,616 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>Mini Battle Royale — Corregido (Mobile + Landscape)</title>
-
-<!-- =========================
-   Estilos
-   ========================= -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Juego de Carreras 3D - index.html</title>
 <style>
-  :root{ --accent:#ffcc33; --hud-bg:rgba(0,0,0,0.5) }
-  html,body{height:100%;margin:0;overflow:hidden;background:#000;font-family:Inter, Arial, sans-serif}
-  canvas{display:block}
+/* =====================================================
+   ESTILO (UI) - Optimizado para pantallas pequeñas
+   ===================================================== */
+:root{
+  --bg:#0b1220;
+  --panel: rgba(255,255,255,0.06);
+  --accent:#ff5a3c;
+  --text:#e6eef6;
+  --glass: rgba(255,255,255,0.04);
+  --ui-size: 14px;
+}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg) 0%, #0e1830 100%);font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+#game {
+  position:fixed; inset:0; overflow:hidden;
+  display:flex; align-items:flex-start; justify-content:center;
+}
+/* canvas ocupa toda la pantalla */
+canvas#glCanvas { display:block; width:100vw; height:100vh; touch-action: none; }
 
-  /* --- Pantalla de carga --- */
-  #loadingScreen{
-    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;
-    background:linear-gradient(180deg,#020417,#001b2b);z-index:2000;color:#fff;
-  }
-  #logo{font-weight:800;letter-spacing:1px;font-size:28px;margin-bottom:14px}
-  #progressBar{width:380px;height:12px;background:#222;border-radius:10px;overflow:hidden}
-  #progress{height:100%;width:0;background:linear-gradient(90deg,var(--accent),#ff9);transition:width .12s}
-  #loadingText{margin-top:10px;opacity:.9;font-size:14px}
+/* HUD */
+.hud {
+  position: absolute;
+  top: 10px; left: 10px;
+  display:flex; gap:8px; align-items:center; z-index:30;
+  pointer-events:none;
+}
+.panel {
+  pointer-events:auto;
+  background:var(--panel);
+  color:var(--text);
+  padding:8px 10px;
+  border-radius:10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+  font-size:var(--ui-size);
+  backdrop-filter: blur(6px);
+  min-width:90px;
+}
+.hud .big { font-weight:700; font-size:16px; }
 
-  /* --- Menú --- */
-  #menu{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1900;color:#fff}
-  .menuCard{background:rgba(255,255,255,0.03);padding:18px;border-radius:12px;text-align:center;backdrop-filter: blur(6px)}
-  button{cursor:pointer;border:none;border-radius:8px;padding:10px 16px;font-weight:700}
-  .btnPrimary{background:var(--accent);color:#000}
-  .btnGhost{background:transparent;border:1px solid rgba(255,255,255,0.08);color:#fff}
+/* Right bottom controls */
+.controls {
+  position:absolute; right:12px; bottom:18px; z-index:40;
+  display:flex; flex-direction:column; gap:8px; align-items:center;
+  pointer-events:none;
+}
+/* Button style for touch controls */
+.btn {
+  pointer-events:auto;
+  width:64px; height:64px; border-radius:50%;
+  background:var(--glass); color:var(--text);
+  display:flex; align-items:center; justify-content:center; font-size:18px;
+  user-select:none; -webkit-user-select:none;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.03);
+  touch-action:none;
+}
+.btn:active { transform: translateY(2px); }
 
-  /* --- HUD --- */
-  #hud{position:fixed;left:12px;top:12px;z-index:1500;color:#fff;background:var(--hud-bg);padding:10px;border-radius:10px;min-width:220px;display:none}
-  #hud .row{display:flex;justify-content:space-between;align-items:center;margin:6px 0}
-  .bar{height:10px;background:#333;border-radius:8px;overflow:hidden}
-  #healthBar{height:100%;background:linear-gradient(90deg,#ff3b3b,#ffb3b3);width:100%}
+/* Steering left-right row */
+.steerRow { display:flex; gap:8px; pointer-events:none; }
+.steerRow .btn { width:56px; height:56px; pointer-events:auto; }
 
-  /* --- Minimap --- */
-  #minimap{position:fixed;right:12px;bottom:12px;width:160px;height:160px;border-radius:10px;background:rgba(0,0,0,0.35);z-index:1500;display:none;padding:6px;box-sizing:border-box}
-  #minimap canvas{width:100%;height:100%;display:block;border-radius:6px}
+/* Bottom-left accel/brake */
+.leftControls { position:absolute; left:12px; bottom:18px; z-index:40; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.leftControls .btn { pointer-events:auto; width:72px; height:72px; border-radius:18px; font-weight:700; }
 
-  /* --- Touch controls (mobile) --- */
-  #touchControls{position:fixed;inset:0;pointer-events:none;z-index:1700;display:none}
-  .joystick{position:fixed;left:14px;bottom:14px;width:120px;height:120px;border-radius:50%;background:rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;pointer-events:auto}
-  .joystick #stick{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.12)}
-  #touchLook{position:fixed;right:0;top:0;bottom:0;width:50%;pointer-events:auto}
-  .touchButtons{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;pointer-events:auto}
-  .touchBtn{width:72px;height:48px;border-radius:8px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+/* Top-right menu and record */
+.topRight { position:absolute; right:10px; top:10px; z-index:40; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
 
-  /* --- Result overlay --- */
-  #result{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:2100;background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.6));color:#fff}
-  #result .text{font-size:40px;font-weight:800;margin-bottom:12px}
+/* Center menu overlay */
+.overlay {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:50;
+  background: linear-gradient(180deg, rgba(2,6,23,0.5), rgba(0,0,0,0.7));
+  color:var(--text);
+  padding:20px;
+}
+.menuCard {
+  width:92%; max-width:420px; background:linear-gradient(180deg,rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  padding:18px; border-radius:12px; text-align:center;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6); pointer-events:auto;
+}
+.menuCard h1 { margin:0 0 8px 0; font-size:20px; color:var(--accent); }
+.menuCard p { margin:6px 0 14px 0; font-size:13px; color: #cfe6ff; opacity:0.9; }
+.primaryBtn {
+  background:linear-gradient(90deg,var(--accent), #ff7f66);
+  border:none; padding:12px 18px; color:white; font-weight:700; border-radius:10px; font-size:15px;
+  box-shadow: 0 8px 24px rgba(255,90,60,0.14);
+}
+.secondary { background:transparent; border:1px solid rgba(255,255,255,0.06); padding:10px 14px; color:var(--text); border-radius:10px; }
 
-  /* --- Orientation overlay --- */
-  #orientOverlay{position:fixed;inset:0;z-index:3000;background:linear-gradient(180deg, rgba(0,0,0,0.9), rgba(0,0,0,0.9));color:#fff;display:none;align-items:center;justify-content:center;text-align:center;padding:20px}
+/* Speedometer bottom center */
+.speedo {
+  position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:35; pointer-events:none;
+  background:var(--panel); padding:8px 12px; border-radius:12px; min-width:110px; text-align:center;
+  font-size:13px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
 
-  /* Responsive: show touch on small screens */
-  @media (max-width:900px){
-    #touchControls{display:block}
-    #hud{left:8px;top:8px;min-width:160px;padding:8px}
-    #minimap{width:120px;height:120px;padding:6px}
-  }
+/* Small responsive tweaks */
+@media (min-width:720px){
+  .btn{ width:72px; height:72px; }
+  .leftControls .btn{ width:84px; height:84px; }
+  .menuCard h1{ font-size:26px; }
+}
 </style>
 </head>
 <body>
+<div id="game">
+  <canvas id="glCanvas"></canvas>
 
-<!-- ===== Pantalla de carga ===== -->
-<div id="loadingScreen" aria-live="polite">
-  <div id="logo">🔥 MINI BATTLE ROYALE (FIXED)</div>
-  <div id="progressBar"><div id="progress"></div></div>
-  <div id="loadingText">Inicializando...</div>
-</div>
-
-<!-- ===== Menú principal (aparece tras cargar) ===== -->
-<div id="menu" role="dialog" aria-modal="true">
-  <div class="menuCard">
-    <h2 style="margin:0 0 8px 0">MINI BATTLE ROYALE</h2>
-    <div style="opacity:.85;margin-bottom:10px">Demo autocontenida — Desktop y Móvil (landscape)</div>
-    <div style="display:flex;gap:8px;justify-content:center">
-      <button id="playBtn" class="btnPrimary">Jugar</button>
-      <button id="settingsBtn" class="btnGhost">Configuración</button>
+  <!-- HUD -->
+  <div class="hud" id="hudLeft">
+    <div class="panel">
+      <div class="big" id="distance">Dist: 0 m</div>
+      <div id="time">Tiempo: 0.0 s</div>
     </div>
-    <div style="margin-top:12px;font-size:13px;opacity:.8">WASD / Joystick · Click o botón disparo · Espacio salta · E recoge</div>
+  </div>
+
+  <div class="topRight">
+    <div class="panel">Récord: <strong id="best">0 m</strong></div>
+    <div class="panel">Vel: <span id="vtxt">0</span> km/h</div>
+  </div>
+
+  <div class="speedo" id="speedo">0 km/h</div>
+
+  <!-- Left accel/brake -->
+  <div class="leftControls">
+    <div class="btn" id="btnAccel">▲</div>
+    <div class="btn" id="btnBrake">■</div>
+  </div>
+
+  <!-- Right steering and nitro -->
+  <div class="controls">
+    <div class="steerRow">
+      <div class="btn" id="btnLeft">◀</div>
+      <div class="btn" id="btnRight">▶</div>
+    </div>
+    <div style="height:8px;"></div>
+    <div class="btn" id="btnNitro" title="Nitro (short boost)">N2O</div>
+    <div style="height:8px;"></div>
+    <div class="btn secondary" id="btnRestart" title="Reiniciar">⟳</div>
+  </div>
+
+  <!-- Center overlay menu -->
+  <div class="overlay" id="menuOverlay">
+    <div class="menuCard">
+      <h1>Rally Low-Poly</h1>
+      <p>Juego de carreras 3D optimizado para móvil. Usa los botones táctiles o el teclado (WASD / Flechas). ¡Toca para empezar!</p>
+      <div style="display:flex; gap:8px; justify-content:center;">
+        <button class="primaryBtn" id="startBtn">Empezar</button>
+        <button class="secondary" id="settingsBtn">Ajustes</button>
+      </div>
+      <div style="margin-top:12px; font-size:12px; color:#cfe6ff; opacity:0.85;">
+        Mejor distancia guardada en el dispositivo.
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ===== HUD ===== -->
-<div id="hud" aria-hidden="true">
-  <div class="row"><div>Vida</div><div id="healthVal">100</div></div>
-  <div class="row"><div class="bar" style="flex:1;margin-right:8px"><div id="healthBar" style="width:100%"></div></div><div id="hpPercent">100%</div></div>
-  <div class="row"><div>Arma</div><div id="weaponName">Ninguna</div></div>
-  <div class="row"><div>Munición</div><div id="ammoDisplay">0 / 0</div></div>
-  <div class="row"><div>Jugadores</div><div id="playersLeft">--</div></div>
-</div>
-
-<!-- ===== Minimap ===== -->
-<div id="minimap"><canvas id="mapCanvas" width="400" height="400"></canvas></div>
-
-<!-- ===== Touch Controls (joystick, look, buttons) ===== -->
-<div id="touchControls" aria-hidden="true">
-  <div class="joystick" id="joystickContainer"><div id="stick"></div></div>
-  <div id="touchLook"></div>
-  <div class="touchButtons">
-    <div class="touchBtn" id="fireBtn">DISPARAR</div>
-    <div class="touchBtn" id="jumpBtn">SALTO</div>
-    <div class="touchBtn" id="pickupBtn">COGER</div>
-  </div>
-</div>
-
-<!-- ===== Result overlay ===== -->
-<div id="result" role="status" aria-live="polite">
-  <div class="text" id="resultText"></div>
-  <button id="restartBtn" class="btnPrimary">Reiniciar</button>
-</div>
-
-<!-- ===== Orientation overlay ===== -->
-<div id="orientOverlay"><div><h2>Gira tu dispositivo a horizontal</h2><p>Este juego funciona mejor en orientación horizontal (paisaje). Por favor gira tu móvil.</p></div></div>
-
-<!-- ===== Three.js CDN ===== -->
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/PointerLockControls.js"></script>
-
-<!-- =========================
-   Script principal
-   ========================= -->
 <script>
-/*
-  Mini Battle Royale — Corregido
-  - Este archivo es autocontenido.
-  - Comentarios explicativos en cada sección.
-  - Objetivo: asegurar que la pantalla de carga y el menú
-    siempre funcionen, y añadir controles móviles + landscape.
-*/
+/* ======================================================
+   Juego de Carreras 3D en UN SOLO ARCHIVO (index.html)
+   Motor: WebGL (sin dependencias externas)
+   Divide el código en secciones: inicialización GL,
+   geometrías simples, lógica del coche, IA básica,
+   UI, controles táctiles, optimizaciones y extras.
+   ====================================================== */
 
-/* ------------------------
-   Estado de carga y UI
-   ------------------------ */
-const loadingScreen = document.getElementById('loadingScreen');
-const progEl = document.getElementById('progress');
-const loadingText = document.getElementById('loadingText');
-const menu = document.getElementById('menu');
-const playBtn = document.getElementById('playBtn');
-const settingsBtn = document.getElementById('settingsBtn');
-const hud = document.getElementById('hud');
-const minimapDiv = document.getElementById('minimap');
-const result = document.getElementById('result');
-const resultText = document.getElementById('resultText');
-const restartBtn = document.getElementById('restartBtn');
-const orientOverlay = document.getElementById('orientOverlay');
+/* ---------------------------
+   UTILIDADES
+   --------------------------- */
+const clamp = (v,a,b)=> Math.max(a, Math.min(b,v));
+const lerp = (a,b,t)=> a + (b-a)*t;
+const now = ()=> performance.now()/1000;
 
-/* ------------------------
-   Variables del motor / juego
-   ------------------------ */
-let renderer, scene, camera;
-let controls; // pointer lock controls for desktop
-let player = null;
-let playerState = null;
-let objects = [];
-let enemies = [];
-let pickups = [];
-let bullets = [];
-let mapCtx = null;
-let isMobile = window.innerWidth <= 900;
-let safeRadius = 160;
-let lastSafeShrink = performance.now();
+/* ---------------------------
+   CONFIG (ajustable)
+   --------------------------- */
 const CONFIG = {
-  mapSize: 500,
-  enemyCount: 5,
-  playersTotal: 6,
-  safeShrinkIntervalSec: 20
+  TRACK_LENGTH: 10000, // longitud virtual
+  MAX_SPEED: 44, // m/s (~158 km/h)
+  ACCEL: 8.0, // m/s^2
+  BRAKE: 14.0,
+  FRICTION: 2.8,
+  STEER_SPEED: 2.6, // radians per second at low speed
+  NITRO_BOOST: 1.8, // multiplicador temporal
+  NITRO_TIME: 1.25, // segundos
+  ENEMY_COUNT: 12,
+  SPAWN_DIST: 160, // distancia delante del jugador para spawnear coches
+  PIXEL_RATIO_LIMIT: 2, // limitar devicePixelRatio para performance
 };
 
-/* AudioContext (debe reanudarse con gesture) */
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-/* ------------------------
-   Simulación de carga robusta
-   - A veces loaders asíncronos (o errores) hacen que la barra nunca termine.
-   - Aquí hacemos una "carga segura": progresión visible que finaliza y muestra menú.
-   ------------------------ */
-(function simulatedSafeLoader(){
-  let p = 0;
-  function step(){
-    // incrementos aleatorios pero aseguramos que llegará a 100 en < 5s
-    p += Math.floor(Math.random()*10) + 8;
-    if(p >= 100) p = 100;
-    progEl.style.width = p + '%';
-    loadingText.innerText = p < 100 ? `Cargando... ${p}%` : 'Listo — Pulsa Jugar';
-    if(p < 100) {
-      setTimeout(step, 120 + Math.random()*150);
-    } else {
-      // mostramos menú tras breve retardo para mejorar UX
-      setTimeout(()=>{ loadingScreen.style.display = 'none'; menu.style.display = 'flex'; }, 400);
-    }
-  }
-  step();
-})();
-
-/* ------------------------
-   UI: manejar botones del menú
-   - Play: arranca la inicialización completa y la animación
-   ------------------------ */
-playBtn.addEventListener('click', async () => {
-  // resume audio (requisito por seguridad del navegador)
-  try { await audioCtx.resume(); } catch(e){}
-  // ocultar menu
-  menu.style.display = 'none';
-  // iniciar motor
-  initGame();
-});
-
-/* Configuración (demo) */
-settingsBtn.addEventListener('click', ()=> alert('Configuración demo.')) ;
-restartBtn.addEventListener('click', ()=> location.reload());
-
-/* ------------------------
-   Orientation check (landscape requirement for small screens)
-   - Muestra overlay si en portrait y ancho pequeño
-   ------------------------ */
-function checkOrientation(){
-  if(window.innerWidth < 900 && window.innerHeight > window.innerWidth){
-    orientOverlay.style.display = 'flex';
-  } else {
-    orientOverlay.style.display = 'none';
-  }
-}
-window.addEventListener('resize', checkOrientation);
-window.addEventListener('orientationchange', ()=> setTimeout(checkOrientation, 300));
-checkOrientation();
-
-/* ------------------------
-   Inicialización del mundo
-   ------------------------ */
-function initGame(){
-  // mostrar HUD / minimap
-  hud.style.display = 'block';
-  minimapDiv.style.display = 'block';
-
-  // renderer
-  renderer = new THREE.WebGLRenderer({antialias:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // scene + camera
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
-  scene.fog = new THREE.FogExp2(0x87ceeb, 0.0006);
-
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
-
-  // lights
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x444466, 0.9);
-  scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-  sun.position.set(100,200,100);
-  scene.add(sun);
-
-  // terreno (plane con pequeñas variaciones)
-  createTerrain();
-
-  // poblar mapa
-  populateMap();
-
-  // player spawn
-  spawnPlayer();
-
-  // enemies
-  spawnEnemies(CONFIG.enemyCount);
-
-  // safe zone visual
-  createSafeZone();
-
-  // minimap canvas context
-  const canvas = document.getElementById('mapCanvas');
-  mapCtx = canvas.getContext('2d');
-
-  // pointer lock controls (desktop)
-  controls = new THREE.PointerLockControls(camera, renderer.domElement);
-  // only request pointer lock after a user gesture on canvas - handled by click listener
-  renderer.domElement.addEventListener('click', ()=> {
-    if(!isMobile && !controls.isLocked) try { controls.lock(); } catch(e){ /*some browsers*/ }
-  });
-
-  // input
-  initInput();
-
-  // resize
-  window.addEventListener('resize', onWindowResize);
-
-  // start loop
-  lastFrameTime = performance.now();
-  animate();
+/* ---------------------------
+   WEBGL/SHADERS (básicos y eficientes)
+   - shader simple con iluminación lambert
+   - dibuja cubos y plano con atributos mínimos
+   --------------------------- */
+const canvas = document.getElementById('glCanvas');
+const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+if(!gl) {
+  alert('WebGL no soportado en este navegador.');
+  throw new Error('WebGL unsupported');
 }
 
-/* ------------------------
-   Terreno: plane con variación simple
-   ------------------------ */
-function createTerrain(){
-  const size = CONFIG.mapSize;
-  const divisions = 200;
-  const geo = new THREE.PlaneGeometry(size, size, divisions, divisions);
-  for(let i=0;i<geo.attributes.position.count;i++){
-    const x = geo.attributes.position.getX(i), y = geo.attributes.position.getY(i);
-    const h = Math.sin(x*0.01*1.7)*Math.cos(y*0.01*1.2)*3 + Math.sin(x*0.01*0.4)*2;
-    geo.attributes.position.setZ(i, h);
-  }
-  geo.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({color:0x2d8a2d, roughness:1});
-  const ground = new THREE.Mesh(geo, mat);
-  ground.rotation.x = -Math.PI/2;
-  ground.receiveShadow = true;
-  scene.add(ground);
-  objects.push(ground);
+/* Ajuste de tamaño y DPR limitado para móviles */
+function resizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, CONFIG.PIXEL_RATIO_LIMIT);
+  const w = Math.max(320, window.innerWidth);
+  const h = Math.max(320, window.innerHeight);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  gl.viewport(0,0,canvas.width, canvas.height);
 }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-/* ------------------------
-   Población: casas, árboles, rocas, pickups
-   ------------------------ */
-function populateMap(){
-  // casas
-  for(let i=0;i<14;i++){
-    const w = rand(6,12), h = rand(4,8), d = rand(6,12);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshStandardMaterial({color:0x8b5a2b}));
-    box.position.set(rand(-CONFIG.mapSize/2+30, CONFIG.mapSize/2-30), h/2-0.5, rand(-CONFIG.mapSize/2+30, CONFIG.mapSize/2-30));
-    scene.add(box); objects.push(box);
+/* Shader sources (simple) */
+const vs = `
+attribute vec3 aPos;
+attribute vec3 aNormal;
+uniform mat4 uMVP;
+uniform mat4 uModel;
+uniform mat3 uNormalMat;
+varying vec3 vNormal;
+varying vec3 vPos;
+void main(){
+  vNormal = normalize(uNormalMat * aNormal);
+  vPos = (uModel * vec4(aPos,1.0)).xyz;
+  gl_Position = uMVP * vec4(aPos,1.0);
+}
+`;
+const fs = `
+precision mediump float;
+varying vec3 vNormal;
+varying vec3 vPos;
+uniform vec3 uLightDir;
+uniform vec3 uColor;
+uniform float uAmbient;
+void main(){
+  float lam = max(dot(normalize(vNormal), normalize(uLightDir)), 0.0);
+  vec3 col = uColor * (uAmbient + (1.0 - uAmbient) * lam);
+  gl_FragColor = vec4(col,1.0);
+}
+`;
+
+/* Compilar shader util */
+function compileShader(src, type){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+    console.error(gl.getShaderInfoLog(s));
+    throw new Error('Shader compile error');
   }
-  // árboles
-  for(let i=0;i<60;i++){
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.5,3.6), new THREE.MeshStandardMaterial({color:0x6b4226}));
-    const leaves = new THREE.Mesh(new THREE.ConeGeometry(2.2,5,8), new THREE.MeshStandardMaterial({color:0x116611}));
-    const x = rand(-CONFIG.mapSize/2+10, CONFIG.mapSize/2-10), z = rand(-CONFIG.mapSize/2+10, CONFIG.mapSize/2-10);
-    trunk.position.set(x,1.8,z); leaves.position.set(x,4.8,z);
-    scene.add(trunk); scene.add(leaves); objects.push(trunk); objects.push(leaves);
-  }
-  // rocas
-  for(let i=0;i<20;i++){
-    const r = rand(1.2,3.2);
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(r), new THREE.MeshStandardMaterial({color:0x7f7f7f}));
-    rock.position.set(rand(-CONFIG.mapSize/2+10, CONFIG.mapSize/2-10), r/1.9, rand(-CONFIG.mapSize/2+10, CONFIG.mapSize/2-10));
-    rock.rotation.set(Math.random(), Math.random(), Math.random());
-    scene.add(rock);
-    objects.push(rock);
-  }
-  // pickups armas (simple)
-  const weaponTypes = [
-    {name:'Rifle', dmg:28, range:180, fireRate:300, mag:30, color:0x2233ff},
-    {name:'Escopeta', dmg:40, range:30, fireRate:900, mag:8, color:0x884400}
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compileShader(vs, gl.VERTEX_SHADER));
+gl.attachShader(prog, compileShader(fs, gl.FRAGMENT_SHADER));
+gl.linkProgram(prog);
+if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+  console.error(gl.getProgramInfoLog(prog));
+  throw new Error('Program link error');
+}
+gl.useProgram(prog);
+
+/* Locations */
+const ATTR = {
+  aPos: gl.getAttribLocation(prog, 'aPos'),
+  aNormal: gl.getAttribLocation(prog, 'aNormal'),
+};
+const UNI = {
+  uMVP: gl.getUniformLocation(prog, 'uMVP'),
+  uModel: gl.getUniformLocation(prog, 'uModel'),
+  uNormalMat: gl.getUniformLocation(prog, 'uNormalMat'),
+  uLightDir: gl.getUniformLocation(prog, 'uLightDir'),
+  uColor: gl.getUniformLocation(prog, 'uColor'),
+  uAmbient: gl.getUniformLocation(prog, 'uAmbient'),
+};
+
+/* Algunas matrices simples (no usaremos librerías externas) */
+function mat4Identity(){ return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; }
+function mat4Multiply(a,b){
+  const o=new Array(16).fill(0);
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++) for(let k=0;k<4;k++) o[i*4+j]+=a[i*4+k]*b[k*4+j];
+  return o;
+}
+function mat4Perspective(fov, aspect, near, far){
+  const f = 1.0/Math.tan(fov/2);
+  const nf = 1/(near - far);
+  return [
+    f/aspect,0,0,0,
+    0,f,0,0,
+    0,0,(far+near)*nf,-1,
+    0,0,(2*far*near)*nf,0
   ];
-  for(let i=0;i<CONFIG.playersTotal;i++){
-    const pos = new THREE.Vector3(rand(-CONFIG.mapSize/2+20, CONFIG.mapSize/2-20), 0.6, rand(-CONFIG.mapSize/2+20, CONFIG.mapSize/2-20));
-    const type = weaponTypes[Math.floor(Math.random()*weaponTypes.length)];
-    createWeaponPickup(pos, type);
+}
+function mat4Translate(tx,ty,tz){
+  const m = mat4Identity(); m[12]=tx; m[13]=ty; m[14]=tz; return m;
+}
+function mat4RotateY(a){
+  const c=Math.cos(a), s=Math.sin(a);
+  return [ c,0,s,0, 0,1,0,0, -s,0,c,0, 0,0,0,1 ];
+}
+function mat4Scale(sx,sy,sz){
+  const m = mat4Identity(); m[0]=sx; m[5]=sy; m[10]=sz; return m;
+}
+function mat3FromMat4(m){
+  // returns mat3 column-major 3x3 from upper-left 3x3 of mat4
+  return [m[0],m[1],m[2], m[4],m[5],m[6], m[8],m[9],m[10]];
+}
+
+/* Multiply mat4 and vec4 (column major) */
+function mat4MulVec3(m, v){
+  const x = v[0], y=v[1], z=v[2];
+  return [
+    m[0]*x + m[4]*y + m[8]*z + m[12],
+    m[1]*x + m[5]*y + m[9]*z + m[13],
+    m[2]*x + m[6]*y + m[10]*z + m[14]
+  ];
+}
+
+/* ---------------------------
+   GEOMETRÍAS (simplicidad: cubos y plano)
+   Para reducir overhead, reutilizamos buffers
+   --------------------------- */
+function createCube(size=1.0){
+  const h = size/2;
+  const positions = new Float32Array([
+    // front
+    -h,-h,h,  h,-h,h,  h,h,h,  -h,h,h,
+    // back
+    -h,-h,-h, -h,h,-h, h,h,-h, h,-h,-h,
+    // top
+    -h,h,-h, -h,h,h, h,h,h, h,h,-h,
+    // bottom
+    -h,-h,-h, h,-h,-h, h,-h,h, -h,-h,h,
+    // right
+    h,-h,-h, h,h,-h, h,h,h, h,-h,h,
+    // left
+    -h,-h,-h, -h,-h,h, -h,h,h, -h,h,-h
+  ]);
+  const normals = new Float32Array([
+    // front
+    0,0,1, 0,0,1, 0,0,1, 0,0,1,
+    // back
+    0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1,
+    // top
+    0,1,0, 0,1,0, 0,1,0, 0,1,0,
+    // bottom
+    0,-1,0, 0,-1,0, 0,-1,0, 0,-1,0,
+    // right
+    1,0,0, 1,0,0, 1,0,0, 1,0,0,
+    // left
+    -1,0,0, -1,0,0, -1,0,0, -1,0,0
+  ]);
+  const indices = new Uint16Array([
+    0,1,2, 0,2,3,
+    4,5,6, 4,6,7,
+    8,9,10, 8,10,11,
+    12,13,14, 12,14,15,
+    16,17,18, 16,18,19,
+    20,21,22, 20,22,23
+  ]);
+  return {positions, normals, indices, vertexCount:24, indexCount:indices.length};
+}
+
+/* Plane (track) - amplia superficie */
+function createPlane(w=200, h=800){
+  const hw = w/2, hh = h/2;
+  const positions = new Float32Array([
+    -hw,0,-hh, hw,0,-hh, hw,0,hh, -hw,0,hh
+  ]);
+  const normals = new Float32Array([0,1,0, 0,1,0, 0,1,0, 0,1,0]);
+  const indices = new Uint16Array([0,1,2, 0,2,3]);
+  return {positions,normals,indices};
+}
+
+/* Buffer helper */
+function createBuffer(attr, data, itemSize, type=gl.ARRAY_BUFFER){
+  const b = gl.createBuffer();
+  gl.bindBuffer(type, b);
+  gl.bufferData(type, data, gl.STATIC_DRAW);
+  return {buf:b, itemSize, count: data.length / itemSize};
+}
+
+/* Crear geometrías y VBOs */
+const cubeMesh = createCube(1);
+const planeMesh = createPlane(10, 1); // we'll scale plane model matrix
+
+const cubePos = createBuffer('pos', cubeMesh.positions, 3);
+const cubeNorm = createBuffer('norm', cubeMesh.normals, 3);
+const cubeIdx = createBuffer('idx', cubeMesh.indices, 1, gl.ELEMENT_ARRAY_BUFFER);
+
+const planePos = createBuffer('pos', planeMesh.positions, 3);
+const planeNorm = createBuffer('norm', planeMesh.normals, 3);
+const planeIdx = createBuffer('idx', planeMesh.indices, 1, gl.ELEMENT_ARRAY_BUFFER);
+
+/* Enable attributes - we'll bind dynamically per draw call */
+gl.enableVertexAttribArray(ATTR.aPos);
+gl.enableVertexAttribArray(ATTR.aNormal);
+
+/* GL state */
+gl.enable(gl.DEPTH_TEST);
+gl.clearColor(0.05,0.08,0.15,1.0);
+
+/* ---------------------------
+   LÓGICA DEL JUEGO (estado)
+   --------------------------- */
+const state = {
+  running: false,
+  startTime: 0,
+  lastTime: now(),
+  elapsed: 0,
+  distance: 0,
+  best: parseFloat(localStorage.getItem('rally_best') || '0') || 0,
+  player: {
+    pos: [0, 0.8, 0], // x,y,z (z es progreso hacia adelante negativo)
+    vel: 0, // forward speed in m/s
+    dir: 0, // yaw (radians)
+    steer: 0, // steering -1..1
+    width: 1.2,
+    length: 2.2,
+    height: 0.6,
+    nitro: {ready: true, cooldown: 0}
+  },
+  enemies: [],
+  effects: [],
+  camera: {pos:[0,5,6], lookAt:[0,0,0]},
+  controls: {acc:0, brake:0, left:0, right:0, nitro:0},
+};
+
+/* ---------------------------
+   ENEMIES / TRAFFIC (IA simple)
+   --------------------------- */
+function spawnEnemies(){
+  state.enemies = [];
+  for(let i=0;i<CONFIG.ENEMY_COUNT;i++){
+    // place enemies along the z axis ahead of origin
+    const z = -(60 + i * (CONFIG.SPAWN_DIST / CONFIG.ENEMY_COUNT) - Math.random()*30);
+    const laneX = (Math.floor(Math.random()*3) - 1) * 3; // -3,0,3
+    const speed = clamp( (Math.random()*20 + 8), 6, CONFIG.MAX_SPEED*0.85 );
+    state.enemies.push({
+      pos: [laneX + (Math.random()-0.5)*1.2, 0.8, z],
+      vel: speed,
+      width:1.2, length:2.1, height:0.6,
+      color: [0.2 + Math.random()*0.6, 0.2, 0.2 + Math.random()*0.2],
+      active: true,
+    });
   }
 }
 
-function createWeaponPickup(pos, type){
-  const geom = new THREE.BoxGeometry(1.2,0.6,2);
-  const mat = new THREE.MeshStandardMaterial({color: type.color});
-  const mesh = new THREE.Mesh(geom, mat);
-  mesh.position.copy(pos);
-  mesh.userData = { pickup: { type:'weapon', weapon: Object.assign({}, type), taken: false } };
-  scene.add(mesh);
-  pickups.push(mesh);
-}
+/* Call on new run */
+spawnEnemies();
 
-/* ------------------------
-   Player (tercera persona)
-   ------------------------ */
-function spawnPlayer(){
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,2.6,8), new THREE.MeshStandardMaterial({color:0x2233ff}));
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.65,16,16), new THREE.MeshStandardMaterial({color:0xffddaa}));
-  body.position.y = 1.3; head.position.y = 2.4; g.add(body); g.add(head);
-  g.position.set(0,2,0);
-  scene.add(g);
-  player = g;
-  player.userData = { health: 100 };
-  // camera behind player
-  camera.position.set(player.position.x, player.position.y + 3.2, player.position.z + 8);
-  camera.lookAt(player.position);
-  // player state object
-  playerState = {
-    health: 100,
-    speed: 6,
-    velocity: new THREE.Vector3(),
-    onGround: false,
-    weapon: null,
-    ammoCarry: 0,
-    canShoot: true,
-    jumpPower: 8
-  };
-  updateHUD();
-}
+/* ---------------------------
+   FÍSICA SIMPLE DEL VEHÍCULO
+   - no es simulación realista, pero jugable
+   --------------------------- */
+function updatePhysics(dt){
+  const p = state.player;
+  const ctl = state.controls;
 
-/* ------------------------
-   Enemigos (bots simples)
-   ------------------------ */
-function spawnEnemies(n){
-  for(let i=0;i<n;i++){
-    const enemy = createEnemy();
-    enemies.push(enemy);
-    scene.add(enemy.mesh);
+  // Accel/brake input
+  let accel = ctl.acc ? CONFIG.ACCEL : 0;
+  if(ctl.brake) accel = -CONFIG.BRAKE;
+
+  // Nitro
+  let nitroMult = 1.0;
+  if(ctl.nitro && p.nitro.ready){
+    p.nitro.ready = false;
+    p.nitro.cooldown = CONFIG.NITRO_TIME;
+    // spawn particles
+    for(let i=0;i<18;i++) {
+      state.effects.push({
+        pos: [p.pos[0] - Math.sin(p.dir)*0.6, 0.2, p.pos[2] + Math.cos(p.dir)*0.6],
+        vel: [ (Math.random()-0.5)*1, Math.random()*0.7,  - (Math.random()*2 + 2.0) ],
+        life: 0.6 + Math.random()*0.4
+      });
+    }
   }
-  updatePlayersLeft();
-}
-function createEnemy(){
-  const mesh = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.85,0.85,2.4,8), new THREE.MeshStandardMaterial({color:0xaa2222}));
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.55,12,12), new THREE.MeshStandardMaterial({color:0xffcc99}));
-  body.position.y = 1.2; head.position.y = 2.2; mesh.add(body); mesh.add(head);
-  mesh.position.set(rand(-CONFIG.mapSize/2+30, CONFIG.mapSize/2-30), 2, rand(-CONFIG.mapSize/2+30, CONFIG.mapSize/2-30));
-  mesh.userData = { health: 100, state: 'roam', speed: 1.7, lastShot: 0, weapon: { name:'Rifle', dmg:18, range:160, fireRate:600, mag:20 } };
-  return { mesh };
-}
-
-/* ------------------------
-   Zona segura (cilindro visual) 
-   ------------------------ */
-let safeZoneMesh = null;
-function createSafeZone(){
-  if(safeZoneMesh) scene.remove(safeZoneMesh);
-  const geo = new THREE.CylinderGeometry(safeRadius, safeRadius, 6, 64, 1, true);
-  const mat = new THREE.MeshBasicMaterial({color:0x00ffcc, transparent:true, opacity:0.06, side: THREE.DoubleSide});
-  safeZoneMesh = new THREE.Mesh(geo, mat);
-  safeZoneMesh.rotation.x = -Math.PI/2;
-  safeZoneMesh.position.y = 3;
-  scene.add(safeZoneMesh);
-}
-
-/* ------------------------
-   Input (teclado, ratón, táctil)
-   ------------------------ */
-const keys = {};
-let mouseDown = false;
-let isPointerLocked = false;
-
-// Event listeners
-function initInput(){
-  // teclado
-  window.addEventListener('keydown', (e)=>{ keys[e.key.toLowerCase()] = true; if(e.key === ' ') jump(); if(e.key.toLowerCase()==='e') pickUp(); });
-  window.addEventListener('keyup', (e)=>{ keys[e.key.toLowerCase()] = false; });
-
-  // mouse
-  document.addEventListener('mousedown', (e)=>{ if(e.button===0) mouseDown = true; });
-  document.addEventListener('mouseup', (e)=>{ if(e.button===0) mouseDown = false; });
-
-  // pointerlock events
-  if(controls){
-    controls.addEventListener('lock', ()=>{ isPointerLocked = true; });
-    controls.addEventListener('unlock', ()=>{ isPointerLocked = false; });
+  if(p.nitro.cooldown > 0){
+    nitroMult = CONFIG.NITRO_BOOST;
+    p.nitro.cooldown -= dt;
+    if(p.nitro.cooldown <= 0) {
+      p.nitro.cooldown = 0;
+      p.nitro.ready = false;
+      // start small cooldown timer before recharging nitro
+      p.nitro.recharge = 3.0;
+    }
+  } else if(p.nitro.recharge) {
+    p.nitro.recharge -= dt;
+    if(p.nitro.recharge <= 0){ p.nitro.recharge = 0; p.nitro.ready = true; }
   }
 
-  // touch controls (show only on small screens)
-  setupTouchControls();
-
-  // resume audio on first interaction (gesture)
-  const resumeAudio = async ()=>{ try{ await audioCtx.resume(); }catch(e){}; window.removeEventListener('pointerdown', resumeAudio); };
-  window.addEventListener('pointerdown', resumeAudio, { once:true });
-}
-
-/* ------------------------
-   Touch controls: joystick left, look right, buttons
-   - Joystick uses pointer events; works on multiple pointers
-   ------------------------ */
-const joystickState = { active:false, id:null, startX:0, startY:0, dx:0, dy:0, maxR:40 };
-function setupTouchControls(){
-  isMobile = window.innerWidth <= 900;
-  document.getElementById('touchControls').style.display = isMobile ? 'block' : 'none';
-
-  const jc = document.getElementById('joystickContainer');
-  const stick = document.getElementById('stick');
-  jc.addEventListener('pointerdown', (ev)=>{
-    joystickState.active = true; joystickState.id = ev.pointerId; joystickState.startX = ev.clientX; joystickState.startY = ev.clientY;
-    jc.setPointerCapture(ev.pointerId);
-    stick.style.transition = '0s';
-  });
-  jc.addEventListener('pointermove', (ev)=>{
-    if(!joystickState.active || ev.pointerId !== joystickState.id) return;
-    const dx = ev.clientX - joystickState.startX;
-    const dy = ev.clientY - joystickState.startY;
-    const dist = Math.hypot(dx, dy);
-    const maxR = joystickState.maxR;
-    const nx = dx * Math.min(1, maxR / Math.max(1, dist));
-    const ny = dy * Math.min(1, maxR / Math.max(1, dist));
-    stick.style.transform = `translate(${nx}px, ${ny}px)`;
-    joystickState.dx = nx / maxR; joystickState.dy = -ny / maxR;
-  });
-  const endJoy = (ev)=>{
-    if(ev.pointerId !== joystickState.id) return;
-    joystickState.active = false; joystickState.id = null; joystickState.dx = 0; joystickState.dy = 0;
-    stick.style.transition = '200ms'; stick.style.transform = 'translate(0,0)';
-    jc.releasePointerCapture(ev.pointerId);
-  };
-  jc.addEventListener('pointerup', endJoy);
-  jc.addEventListener('pointercancel', endJoy);
-  jc.addEventListener('pointerleave', endJoy);
-
-  // look area (right half)
-  let lookActive=false, lookId=null, lastX=0, lastY=0;
-  const lookArea = document.getElementById('touchLook');
-  lookArea.addEventListener('pointerdown', (ev)=>{ lookActive=true; lookId=ev.pointerId; lastX=ev.clientX; lastY=ev.clientY; lookArea.setPointerCapture(ev.pointerId); });
-  lookArea.addEventListener('pointermove', (ev)=>{ if(!lookActive || ev.pointerId!==lookId) return; const dx = ev.clientX - lastX; const dy = ev.clientY - lastY; lastX = ev.clientX; lastY = ev.clientY; player.rotation.y -= dx * 0.0025; camera.position.y = THREE.MathUtils.clamp(camera.position.y - dy * 0.01, player.position.y + 1.6, player.position.y + 6.0); });
-  lookArea.addEventListener('pointerup', (ev)=>{ if(ev.pointerId !== lookId) return; lookActive=false; lookId=null; lookArea.releasePointerCapture(ev.pointerId); });
-  lookArea.addEventListener('pointercancel', ()=>{ lookActive=false; lookId=null; });
-
-  // botones
-  document.getElementById('fireBtn').addEventListener('pointerdown', ()=> mouseDown = true);
-  document.getElementById('fireBtn').addEventListener('pointerup', ()=> mouseDown = false);
-  document.getElementById('jumpBtn').addEventListener('click', jump);
-  document.getElementById('pickupBtn').addEventListener('click', pickUp);
-
-  // update display on resize
-  window.addEventListener('resize', ()=> { isMobile = window.innerWidth <= 900; document.getElementById('touchControls').style.display = isMobile ? 'block' : 'none'; });
-}
-
-/* ------------------------
-   Movimiento y física (simplificado)
-   ------------------------ */
-const GRAVITY = -25;
-function applyMovement(delta){
-  // compute move input
-  let moveX = 0, moveZ = 0;
-  if(isMobile && joystickState.active){ moveX = joystickState.dx; moveZ = joystickState.dy; }
-  else {
-    if(keys['w']) moveZ -= 1;
-    if(keys['s']) moveZ += 1;
-    if(keys['a']) moveX -= 1;
-    if(keys['d']) moveX += 1;
+  // Velocity integration
+  p.vel += accel * dt * nitroMult;
+  // friction
+  const drag = CONFIG.FRICTION * dt;
+  if(!ctl.acc && !ctl.brake){
+    // natural deceleration
+    p.vel -= Math.sign(p.vel) * drag;
+    if(Math.abs(p.vel) < 0.02) p.vel = 0;
   }
+  p.vel = clamp(p.vel, 0, CONFIG.MAX_SPEED * nitroMult);
 
-  const len = Math.hypot(moveX, moveZ);
-  if(len > 0.001){
-    moveX /= len; moveZ /= len;
-    // camera yaw basis
-    const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir);
-    const camYaw = Math.atan2(camDir.x, camDir.z);
-    const s = Math.sin(camYaw), c = Math.cos(camYaw);
-    const worldDX = moveX * c - moveZ * s;
-    const worldDZ = moveX * s + moveZ * c;
-    player.userData.vel = player.userData.vel || new THREE.Vector3();
-    player.userData.vel.x = worldDX * playerState.speed;
-    player.userData.vel.z = worldDZ * playerState.speed;
-    const desiredAngle = Math.atan2(worldDX, worldDZ);
-    player.rotation.y = THREE.MathUtils.lerpAngle(player.rotation.y, desiredAngle, 0.15);
-  } else {
-    player.userData.vel = player.userData.vel || new THREE.Vector3();
-    player.userData.vel.x = THREE.MathUtils.damp(player.userData.vel.x || 0, 0, 8, delta);
-    player.userData.vel.z = THREE.MathUtils.damp(player.userData.vel.z || 0, 0, 8, delta);
-  }
+  // Steering: steering effect reduces with speed
+  const steerInput = (ctl.left? -1:0) + (ctl.right? 1:0);
+  const steerEff = steerInput * (CONFIG.STEER_SPEED * (1 - clamp(p.vel / CONFIG.MAX_SPEED, 0, 0.95)));
+  p.dir += steerEff * dt;
 
-  // vertical
-  playerState.velocity = playerState.velocity || new THREE.Vector3();
-  playerState.velocity.y += GRAVITY * delta;
-  // apply positional integration
-  const vx = (player.userData.vel && player.userData.vel.x) || 0;
-  const vz = (player.userData.vel && player.userData.vel.z) || 0;
-  player.position.x += vx * delta;
-  player.position.y += playerState.velocity.y * delta;
-  player.position.z += vz * delta;
+  // Move forward in local z (we treat forward as negative z)
+  // We orient movement along player's dir
+  const dx = Math.sin(p.dir) * p.vel * dt;
+  const dz = Math.cos(p.dir) * p.vel * dt * -1;
+  p.pos[0] += dx;
+  p.pos[2] += dz;
 
-  // ground raycast to terrain (objects[0] is ground)
-  const down = new THREE.Vector3(0,-1,0);
-  const ray = new THREE.Raycaster(new THREE.Vector3(player.position.x, 200, player.position.z), down, 0, 400);
-  const hits = ray.intersectObject(objects[0], true);
-  if(hits.length){
-    const groundY = hits[0].point.y;
-    if(player.position.y <= groundY + 1.05){
-      player.position.y = groundY + 1.05;
-      playerState.velocity.y = 0;
-      playerState.onGround = true;
-    } else {
-      playerState.onGround = false;
+  // Keep inside road bounds x ~ [-8,8]
+  p.pos[0] = clamp(p.pos[0], -9.0, 9.0);
+
+  // Update distance traveled (z negative decreases)
+  state.distance = Math.max(state.distance, -p.pos[2]);
+
+  // Update enemies: simple forward movement relative to world (they move toward positive z)
+  for(let e of state.enemies){
+    // enemy moves forward (positive z) with slight lane weaving
+    e.pos[2] += e.vel * dt * 0.5 * 0.3; // relative slow pace
+    // if too far behind player, respawn further ahead
+    if(e.pos[2] - state.player.pos[2] > CONFIG.SPAWN_DIST + 60){
+      e.pos[2] = state.player.pos[2] - (50 + Math.random()*CONFIG.SPAWN_DIST);
+      e.pos[0] = (Math.floor(Math.random()*3) - 1) * 3 + (Math.random()-0.5)*1.2;
+      e.vel = clamp(e.vel * (0.9 + Math.random()*0.4), 6, CONFIG.MAX_SPEED*0.85);
     }
   }
 
-  // bounds clamp
-  const limit = CONFIG.mapSize/2 - 2;
-  player.position.x = Math.max(-limit, Math.min(limit, player.position.x));
-  player.position.z = Math.max(-limit, Math.min(limit, player.position.z));
-
-  // camera third-person follow
-  const offset = new THREE.Vector3(0, 2.6, 10).applyAxisAngle(new THREE.Vector3(0,1,0), player.rotation.y);
-  const desiredCamPos = new THREE.Vector3().copy(player.position).add(offset);
-  camera.position.lerp(desiredCamPos, 0.12);
-  camera.lookAt(new THREE.Vector3().copy(player.position).add(new THREE.Vector3(0,2,0)));
-}
-
-/* ------------------------
-   Saltar y recoger
-   ------------------------ */
-function jump(){ if(playerState.onGround){ playerState.velocity.y = playerState.jumpPower; playerState.onGround = false; } }
-function pickUp(){
-  for(let i=0;i<pickups.length;i++){
-    const p = pickups[i];
-    if(!p || !p.userData || !p.userData.pickup) continue;
-    const d = p.position.distanceTo(player.position);
-    if(d < 2.2 && !p.userData.pickup.taken){
-      playerState.weapon = Object.assign({}, p.userData.pickup.weapon);
-      playerState.ammoCarry = playerState.weapon.mag * 2;
-      p.userData.pickup.taken = true;
-      scene.remove(p); pickups.splice(i,1);
-      updateHUD();
-      playBeep(900, 0.06);
-      return;
+  // Simple collision detection (player vs enemies)
+  for(let e of state.enemies){
+    if(!e.active) continue;
+    const dx = e.pos[0] - p.pos[0];
+    const dz = e.pos[2] - p.pos[2];
+    const distX = Math.abs(dx);
+    const distZ = Math.abs(dz);
+    if(distX < (e.width*0.6 + p.width*0.4) && distZ < (e.length*0.6 + p.length*0.4)){
+      // Collision! slow player and bounce a little
+      p.vel *= 0.45;
+      // bounce back
+      p.pos[2] += 1.6;
+      // mark enemy briefly inactive
+      e.active = false;
+      setTimeout(()=> e.active = true, 900);
+      // small camera shake effect
+      state.effects.push({shake:0.35, life:0.25});
     }
   }
-}
 
-/* ------------------------
-   Disparo (raycast instant hit) y visual bullets
-   ------------------------ */
-function playerShoot(){
-  if(!mouseDown) return;
-  if(!playerState.weapon || playerState.ammoCarry <= 0) return;
-  if(!playerState.canShoot) return;
-  playerState.canShoot = false;
-  setTimeout(()=> playerState.canShoot = true, playerState.weapon.fireRate);
-
-  playerState.ammoCarry -= 1;
-  updateHUD();
-  playBeep(900, 0.04);
-
-  const origin = new THREE.Vector3(); camera.getWorldPosition(origin);
-  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-  const ray = new THREE.Raycaster(origin, dir, 0, playerState.weapon.range);
-  // check enemy hits (each enemy mesh is enemy.mesh)
-  const enemyMeshes = enemies.map(e => e.mesh);
-  const inter = ray.intersectObjects(enemyMeshes, true);
-  if(inter.length){
-    const hit = inter[0];
-    // find parent enemy
-    let parent = hit.object;
-    while(parent && !enemies.find(en => en.mesh === parent)) parent = parent.parent;
-    const enemy = enemies.find(en => en.mesh === parent || (parent && en.mesh.children.includes(parent)));
-    if(enemy){
-      enemy.mesh.userData.health -= playerState.weapon.dmg;
-      if(enemy.mesh.userData.health <= 0){
-        scene.remove(enemy.mesh);
-        enemies = enemies.filter(en => en !== enemy);
-        updatePlayersLeft();
-      }
-    }
-  }
-  // bullet visual
-  spawnBullet(origin.clone(), dir.clone(), playerState.weapon.range);
-}
-
-function spawnBullet(origin, dir, range){
-  const geo = new THREE.SphereGeometry(0.08,6,6);
-  const mat = new THREE.MeshBasicMaterial({color:0xffff66});
-  const m = new THREE.Mesh(geo, mat);
-  m.position.copy(origin);
-  m.userData = { dir, speed:240, traveled:0, maxRange: range };
-  scene.add(m); bullets.push(m);
-}
-function updateBullets(delta){
-  for(let i=bullets.length-1;i>=0;i--){
-    const b = bullets[i];
-    const move = b.userData.dir.clone().multiplyScalar(b.userData.speed * delta);
-    b.position.add(move);
-    b.userData.traveled += move.length();
-    if(b.userData.traveled > b.userData.maxRange){
-      scene.remove(b); bullets.splice(i,1);
+  // Update particle effects
+  for(let i=state.effects.length-1;i>=0;i--){
+    const fx = state.effects[i];
+    if(fx.life !== undefined){
+      fx.life -= dt;
+      fx.pos[0] += fx.vel[0] * dt;
+      fx.pos[1] += fx.vel[1] * dt;
+      fx.pos[2] += fx.vel[2] * dt;
+      fx.vel[1] -= 6.0 * dt; // gravity
+      if(fx.life <= 0) state.effects.splice(i,1);
+    } else if(fx.shake){
+      fx.life -= dt;
+      if(fx.life <= 0) state.effects.splice(i,1);
     }
   }
 }
 
-/* ------------------------
-   IA bots simple
-   ------------------------ */
-function updateEnemies(delta){
-  for(let i=enemies.length-1;i>=0;i--){
-    const e = enemies[i];
-    if(!e || !e.mesh) continue;
-    if(e.mesh.userData.health <= 0){
-      scene.remove(e.mesh);
-      enemies.splice(i,1);
-      updatePlayersLeft();
-      continue;
-    }
-    const pos = e.mesh.position;
-    const dist = pos.distanceTo(player.position);
-    if(dist < 120){
-      // chase
-      const dir = new THREE.Vector3().subVectors(player.position, pos).setY(0).normalize();
-      pos.add(dir.multiplyScalar(e.mesh.userData.speed * delta));
-      const desired = Math.atan2(dir.x, dir.z);
-      e.mesh.rotation.y = THREE.MathUtils.lerpAngle(e.mesh.rotation.y, desired, 0.1);
-      if(dist <= e.mesh.userData.weapon.range){
-        const now = performance.now();
-        if(now - e.mesh.userData.lastShot > e.mesh.userData.weapon.fireRate){
-          e.mesh.userData.lastShot = now;
-          enemyShoot(e);
-        }
-      }
-    } else {
-      // roam
-      if(!e.mesh.userData._roamTarget || e.mesh.position.distanceTo(e.mesh.userData._roamTarget) < 2){
-        e.mesh.userData._roamTarget = new THREE.Vector3(rand(-CONFIG.mapSize/2+20, CONFIG.mapSize/2-20), 0, rand(-CONFIG.mapSize/2+20, CONFIG.mapSize/2-20));
-      }
-      const dir = new THREE.Vector3().subVectors(e.mesh.userData._roamTarget, e.mesh.position).setY(0).normalize();
-      e.mesh.position.add(dir.multiplyScalar(e.mesh.userData.speed * delta * 0.6));
-    }
-    if(dist < 1.6){
-      playerState.health -= 0.25; updateHUD();
-    }
-  }
-}
-function enemyShoot(enemy){
-  const origin = new THREE.Vector3().copy(enemy.mesh.position).add(new THREE.Vector3(0,1.6,0));
-  const dir = new THREE.Vector3().subVectors(player.position.clone().add(new THREE.Vector3(0,1.4,0)), origin).normalize();
-  const dist = origin.distanceTo(player.position);
-  const hitChance = Math.max(0.18, 1 - (dist/250));
-  if(Math.random() < hitChance){
-    playerState.health -= enemy.mesh.userData.weapon.dmg * 0.06;
-    updateHUD();
-    flashScreen(0xff3333, 0.06);
-  }
-  playBeep(260, 0.02);
+/* ---------------------------
+   CÁMARA (tercera persona sigue al coche)
+   --------------------------- */
+function updateCamera(dt){
+  const p = state.player;
+  // desired camera position slightly above and behind
+  const back = 5 + clamp(state.player.vel*0.08,0,6);
+  const up = 2.6;
+  const targetPos = [
+    p.pos[0] - Math.sin(p.dir) * back,
+    p.pos[1] + up,
+    p.pos[2] + Math.cos(p.dir) * back
+  ];
+  // smooth lerp
+  const cam = state.camera;
+  cam.pos[0] = lerp(cam.pos[0], targetPos[0], 0.14);
+  cam.pos[1] = lerp(cam.pos[1], targetPos[1], 0.12);
+  cam.pos[2] = lerp(cam.pos[2], targetPos[2], 0.14);
+  cam.lookAt[0] = lerp(cam.lookAt[0], p.pos[0], 0.18);
+  cam.lookAt[1] = lerp(cam.lookAt[1], p.pos[1] + 0.4, 0.12);
+  cam.lookAt[2] = lerp(cam.lookAt[2], p.pos[2] - 2.0, 0.18);
 }
 
-/* ------------------------
-   Zona segura: reducción y daño si estás fuera
-   ------------------------ */
-function updateSafeZone(delta, now){
-  if(now - lastSafeShrink > CONFIG.safeShrinkIntervalSec * 1000){
-    lastSafeShrink = now;
-    safeRadius = Math.max(20, safeRadius * 0.72);
-    createSafeZone();
-  }
-  const dist = Math.sqrt(player.position.x*player.position.x + player.position.z*player.position.z);
-  if(dist > safeRadius){
-    playerState.health -= 6 * delta;
-    updateHUD();
-    flashScreen(0xff4444, 0.02);
-  } else {
-    playerState.health = Math.min(100, playerState.health + 2 * delta);
-    updateHUD();
-  }
-}
+/* ---------------------------
+   RENDER (dibujar con WebGL)
+   - dibuja: plano pista, carretera con marcas,
+             coche jugador (box), enemigos (boxes),
+             montañas low-poly (cubes escalados)
+   - minimiza draw calls: usamos cubos con matrices diferentes
+   --------------------------- */
 
-/* ------------------------
-   HUD y Minimap
-   ------------------------ */
-function updateHUD(){
-  document.getElementById('healthVal').innerText = Math.max(0, Math.floor(playerState.health));
-  const pct = Math.max(0, Math.min(100, Math.floor(playerState.health)));
-  document.getElementById('healthBar').style.width = pct + '%';
-  document.getElementById('hpPercent').innerText = pct + '%';
-  document.getElementById('weaponName').innerText = playerState.weapon ? playerState.weapon.name : 'Ninguna';
-  document.getElementById('ammoDisplay').innerText = (playerState.weapon ? Math.max(0, playerState.ammoCarry) : 0) + ' / ' + (playerState.weapon ? playerState.weapon.mag : 0);
-  document.getElementById('playersLeft').innerText = (enemies.length + 1);
-}
-
-function renderMinimap(){
-  const canvas = document.getElementById('mapCanvas');
-  const ctx = mapCtx;
-  ctx.clearRect(0,0,canvas.width, canvas.height);
-  const size = CONFIG.mapSize;
-  const scale = canvas.width / size;
-  // fondo
-  ctx.fillStyle = '#0a2a12'; ctx.fillRect(0,0,canvas.width, canvas.height);
-  // safe zone
-  ctx.beginPath(); ctx.fillStyle='rgba(0,255,204,0.08)'; const cx = canvas.width/2, cy = canvas.height/2, r = safeRadius * scale; ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
-  // helper transform
-  const mapPos = v => ({ x: (v.x + size/2) * scale, y: (v.z + size/2) * scale });
-  // pickups
-  ctx.fillStyle='#ffcc33'; pickups.forEach(p=>{ const mp = mapPos(p.position); ctx.fillRect(mp.x-3, mp.y-3, 6, 6); });
-  // enemies
-  ctx.fillStyle='#ff4444'; enemies.forEach(e=>{ const mp = mapPos(e.mesh.position); ctx.beginPath(); ctx.arc(mp.x, mp.y, 3.5, 0, Math.PI*2); ctx.fill(); });
-  // player
-  ctx.fillStyle='#3399ff'; const pp = mapPos(player.position); ctx.beginPath(); ctx.arc(pp.x, pp.y, 5, 0, Math.PI*2); ctx.fill();
-  // border
-  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=2; ctx.strokeRect(0,0,canvas.width, canvas.height);
-}
-
-/* ------------------------
-   Flash overlay (daño)
-   ------------------------ */
-const flashOverlay = document.createElement('div');
-flashOverlay.style.position='fixed'; flashOverlay.style.inset='0'; flashOverlay.style.pointerEvents='none';
-flashOverlay.style.mixBlendMode='screen'; flashOverlay.style.zIndex='2500'; document.body.appendChild(flashOverlay);
-let flashTimer = 0, flashColor = 0xff0000;
-function flashScreen(color, amount){ flashTimer = Math.max(flashTimer, amount); flashColor = color; }
-
-/* ------------------------
-   Sonido sencillo (beep)
-   ------------------------ */
-function playBeep(freq = 440, dur = 0.05){
-  try{
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = 'sine'; o.frequency.value = freq; g.gain.value = 0.03;
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); setTimeout(()=> o.stop(), dur*1000);
-  } catch(e){}
-}
-
-/* ------------------------
-   Loop de animación
-   ------------------------ */
-let lastFrameTime = performance.now();
-function animate(){
-  const now = performance.now();
-  const delta = Math.min(0.05, (now - lastFrameTime) / 1000);
-  lastFrameTime = now;
-
-  if(player){
-    applyMovement(delta);
-    playerShootHandler();
-    updateBullets(delta);
-    updateEnemies(delta);
-    updateSafeZone(delta, now);
-    updateHUD();
-    renderMinimap();
-  }
-
-  // flash overlay decay
-  if(flashTimer > 0){
-    const hex = '#' + flashColor.toString(16).padStart(6,'0');
-    flashOverlay.style.background = `radial-gradient(circle at center, ${hex} ${Math.min(60, flashTimer*200)}px, transparent 60%)`;
-    flashTimer = Math.max(0, flashTimer - delta*0.9);
-  } else {
-    flashOverlay.style.background = 'transparent';
-  }
-
-  // win/lose checks
-  if(playerState && playerState.health <= 0){
-    endGame(false); return;
-  }
-  if(enemies.length === 0 && playerState){
-    endGame(true); return;
-  }
-
-  if(renderer && scene && camera) renderer.render(scene, camera);
-  requestAnimationFrame(animate);
-}
-
-/* ------------------------
-   Player shoot handler (calls playerShoot when mouseDown)
-   - Separado para evitar multiples referencias
-   ------------------------ */
-function playerShootHandler(){
-  if(mouseDown) playerShoot();
-}
-
-/* ------------------------
-   End Game
-   ------------------------ */
-function endGame(victory){
-  resultText.innerText = victory ? '¡VICTORIA! Eres el último.' : 'DERROTA. Has sido eliminado.';
-  result.style.display = 'flex';
-  // unlock pointer if locked
-  if(controls && controls.isLocked) controls.unlock();
-}
-
-/* ------------------------
-   Utility helpers
-   ------------------------ */
-function rand(a,b){ return a + Math.random()*(b-a); }
-function updatePlayersLeft(){ document.getElementById('playersLeft').innerText = (enemies.length + 1); }
-function onWindowResize(){ if(!camera || !renderer) return; camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); checkOrientation(); }
-
-/* ------------------------
-   Extra: create enemies used in IA earlier (implementation reused)
-   ------------------------ */
-// Implementación de crearEnemy ya incluida arriba cuando es llamada en spawnEnemies
-
-/* ------------------------
-   Seguridad: evitar que el juego se quede bloqueado en carga
-   - Si por alguna razón Three failed, mostramos mensaje en consola y menú queda visible
-   ------------------------ */
-window.addEventListener('error', (ev) => {
-  console.error('Error detectado:', ev.message, ev.filename, ev.lineno);
-  // mostramos el menu para que el usuario pueda intentar recargar o revisar
-  loadingScreen.style.display = 'none';
-  menu.style.display = 'flex';
-});
-
-/* ------------------------
-   Manejo de excepciones para promesas sin manejar
-   ------------------------ */
-window.addEventListener('unhandledrejection', (ev) => {
-  console.error('Unhandled rejection:', ev.reason);
-  loadingScreen.style.display = 'none';
-  menu.style.display = 'flex';
-});
-
-/* ------------------------
-   Nota: este prototipo es funcional y estable.
-   - Si sigue sin cargarte: dime exactamente qué navegador y dispositivo usas,
-     y copia cualquier error de la consola (F12 -> Console) para que lo arregle.
-   - Puedo añadir más contenido (más bots, armas, sonidos, animaciones, 3000+ líneas)
-     pero lo haré paso a paso para no romper la estabilidad.
-   ------------------------ */
-</script>
-</body>
-</html>
+/* Helper: set attribute pointers for a buffer */
+function bindAttrib(buffer, attrLoc, itemSize, type=gl.FLOAT){
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buf);
+  gl.vertexAttribPointer(
